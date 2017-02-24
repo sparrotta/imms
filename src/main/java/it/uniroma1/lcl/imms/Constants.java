@@ -1,15 +1,14 @@
 package it.uniroma1.lcl.imms;
 
-import java.util.List;
-import java.util.Map;
-import java.util.function.Predicate;
-import java.util.regex.Pattern;
-
 import edu.stanford.nlp.ling.CoreAnnotation;
 import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.pipeline.Annotator.Requirement;
 import edu.stanford.nlp.util.ErasureUtils;
 import it.uniroma1.lcl.imms.feature.Feature;
+
+import java.util.List;
+import java.util.function.Predicate;
+import java.util.regex.Pattern;
 
 public interface Constants {
 
@@ -27,10 +26,15 @@ public interface Constants {
 	public static final String PROPERTY_IMMS_POS_WINDOWSIZE = IMMS_POS+".windowsize";
 	
 	public static final String IMMS_LCOLLOCATION = "feat_lcollocation";
-	public static final Requirement IMMS_LCOLLOCATION_REQUIREMENT = new Requirement(IMMS_POS);
+	public static final Requirement IMMS_LCOLLOCATION_REQUIREMENT = new Requirement(IMMS_LCOLLOCATION);
 	public static final String PROPERTY_IMMS_LCOLLOCATIONSET = IMMS_LCOLLOCATION+".set";
 
-	
+	public static final String IMMS_WORDEMBED = "feat_wordembed";
+	public static final Requirement IMMS_WORDEMBED_REQUIREMENT = new Requirement(IMMS_LCOLLOCATION);
+	public static final String PROPERTY_IMMS_WORDEMBED_WINDOWSIZE = IMMS_WORDEMBED + ".windowsize";
+	public static final String PROPERTY_IMMS_WORDEMBED_FILE = IMMS_WORDEMBED + ".file";
+
+
 	public static class FeaturesAnnotation implements CoreAnnotation<List<Feature>> {
 		public Class<List<Feature>> getType() {
 			return ErasureUtils.<Class<List<Feature>>> uncheckedCast(List.class);

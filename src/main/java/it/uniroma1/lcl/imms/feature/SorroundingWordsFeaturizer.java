@@ -1,13 +1,5 @@
 package it.uniroma1.lcl.imms.feature;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Properties;
-import java.util.Set;
-import java.util.function.Predicate;
-import java.util.regex.Pattern;
-
 import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
 import edu.stanford.nlp.ling.CoreLabel;
@@ -16,6 +8,8 @@ import edu.stanford.nlp.pipeline.Annotator;
 import edu.stanford.nlp.util.CoreMap;
 import it.uniroma1.lcl.imms.Constants;
 import it.uniroma1.lcl.imms.Constants.HeadAnnotation;
+
+import java.util.*;
 
 public class SorroundingWordsFeaturizer implements Annotator {
 
@@ -359,11 +353,11 @@ public class SorroundingWordsFeaturizer implements Annotator {
 		List<Feature> features = new ArrayList<Feature>();
 		int beforeSize = before.size();
 		for(int i=Math.max(0,beforeSize-windowSize); i<beforeSize; i++){
-			features.add(new Feature<Boolean>("S-" +(beforeSize-i)+"_"+before.get(i),true));
+			features.add(new Feature<Boolean>("S_"+before.get(i),true));
 		}
 		int afterSize = after.size();
 		for(int i=0;i<Math.min(windowSize,afterSize);i++){
-			features.add(new Feature<Boolean>("S+"+(i+1)+"_"+after.get(i),true));
+			features.add(new Feature<Boolean>("S_"+after.get(i),true));
 		}
 		head.get(Constants.FeaturesAnnotation.class).addAll(features);		
 	}
