@@ -7,6 +7,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -16,52 +17,20 @@ import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 
-import edu.stanford.nlp.ling.CoreAnnotations;
-import edu.stanford.nlp.ling.CoreAnnotations.ContextsAnnotation;
-import edu.stanford.nlp.ling.CoreAnnotations.HeadWordStringAnnotation;
-import edu.stanford.nlp.ling.CoreAnnotations.WordPositionAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations.WordSenseAnnotation;
 import edu.stanford.nlp.ling.CoreLabel;
-import edu.stanford.nlp.ling.WordLemmaTag;
 import edu.stanford.nlp.pipeline.Annotation;
-import edu.stanford.nlp.trees.TreeCoreAnnotations.HeadWordLabelAnnotation;
 import it.uniroma1.lcl.imms.Constants;
-import it.uniroma1.lcl.imms.corpus.ICorpus;
+import it.uniroma1.lcl.imms.Constants.DocSourceAnnotation;
+import it.uniroma1.lcl.imms.Constants.LexicalItemAnnotation;
+import it.uniroma1.lcl.imms.corpus.ICorpusReader;
 import it.uniroma1.lcl.imms.feature.Feature;
 
-public class SemevalLexicalCorpus implements ICorpus {
+public class SensEvalLexicalSampleCorpus implements ICorpusReader {
 
 	XMLStreamReader xmlReader;
-	private Map<String, String> senses = new HashMap<String,String>();
-	
-	public SemevalLexicalCorpus(String corpusFile) throws FileNotFoundException, XMLStreamException {
-		XMLInputFactory f = XMLInputFactory.newInstance();
-		xmlReader = f.createXMLStreamReader(new FileInputStream(corpusFile));
-	}
-
-	public SemevalLexicalCorpus(String corpusFile,String sensesFile) throws XMLStreamException, IOException, ParseException {
-		this(corpusFile);		
-		BufferedReader reader=null;
-		try{
-			reader = new BufferedReader(new FileReader(sensesFile));
-			String line;
-			int offset=0;
-			while((line = reader.readLine())!=null){			
-				String[] entry = line.split("\\s+");
-				if(entry.length!=3){
-					throw new ParseException("Sense file must have three fields per line",offset);
-				}
-				offset+=line.length();
-				senses.put(entry[1],entry[2]);
-			}
-		} finally {
-			if(reader!=null){
-				reader.close();
-			}
-		}
+	private Map<String, String> answers = new HashMap<String,String>();
 		
-	}
-	
 	@Override
 	public Iterator<Annotation> iterator() {
 		return new SemevalTextIterator(xmlReader);
@@ -82,7 +51,7 @@ public class SemevalLexicalCorpus implements ICorpus {
 		private String pos;
 		private String lang;
 		
-		private SemEvalLexicalInstance instance;
+		private SenseEvalLexicalItemInstance instance;
 		
 		public SemevalTextIterator(XMLStreamReader xmlReader) {
 			this.elementsStack = new Stack<String>();
@@ -103,7 +72,7 @@ public class SemevalLexicalCorpus implements ICorpus {
 
 		@Override
 		public Annotation next() {
-			SemEvalLexicalInstance nextInstance = null;
+			SenseEvalLexicalItemInstance nextInstance = null;
 			if(hasNext()){
 				try{
 					doNext();				
@@ -141,12 +110,12 @@ public class SemevalLexicalCorpus implements ICorpus {
 						String docsrc = xmlReader.getAttributeValue(null, "docsrc");
 						String answer = xmlReader.getAttributeValue(null, "answer");
 						if(answer==null){
-							answer = senses.get(id);
+							answer = answers.get(id);
 						}
 //						if(answer==null){
 //							throw new RuntimeException("Parser error: cannot associate a sense to instance "+id);
 //						}
-						instance = new SemEvalLexicalInstance(answer,lang, id, item, pos, docsrc);
+						instance = new SenseEvalLexicalItemInstance(answer,lang, id, item, pos, docsrc);
 						return;
 					case ELEMENT_ANSWER:
 						check(4, ELEMENT_INSTANCE);
@@ -219,7 +188,7 @@ public class SemevalLexicalCorpus implements ICorpus {
 
 	}
 
-	class SemEvalLexicalInstance{
+	class SenseEvalLexicalItemInstance{
 
 		private String lang;
 		private String id;
@@ -234,8 +203,7 @@ public class SemevalLexicalCorpus implements ICorpus {
 		private boolean headSet;
 		private String headSense;
 
-		public SemEvalLexicalInstance(String headSense, String lang, String id, String item, String pos,
-				String docsrc) {
+		public SenseEvalLexicalItemInstance(String headSense, String lang, String id, String item, String pos, String docsrc) {
 			this.lang = lang;
 			this.id = id;
 			this.item = item;
@@ -288,29 +256,54 @@ public class SemevalLexicalCorpus implements ICorpus {
 		}
 		
 		Annotation toAnnotation(){
-			Annotation anno = new Annotation(this.getLeftContext()+this.getHead()+this.getRightContext());
-			anno.set(CoreAnnotations.DocIDAnnotation.class, this.id);
-			anno.set(Constants.LexicalElementAnnotation.class,this.item);
-			
+			Annotation anno = new Annotation(this.getLeftContext()+this.getHead()+this.getRightContext());			
+						
 			CoreLabel head = new CoreLabel();
+			head.setDocID(this.id);
 			head.setBeginPosition(this.getLeftContext().length());
 			head.setEndPosition(this.getLeftContext().length()+this.getHead().length());			
+			head.set(DocSourceAnnotation.class, docsrc);
+			head.set(LexicalItemAnnotation.class,this.item);
 			head.set(WordSenseAnnotation.class, headSense==null ? Constants.UNKNOWN_SENSE : headSense);
 			head.set(Constants.FeaturesAnnotation.class, new ArrayList<Feature>());
-			anno.set(Constants.HeadAnnotation.class, head);
 			
-			HashMap<String, String> hm = new HashMap<String,String>();
-			hm.put("lang", this.lang);
-			hm.put("id", this.id);
-			hm.put("item", this.item);
-			hm.put("pos", this.pos);
-			hm.put("docsrc", this.docsrc);
-			hm.put("leftContext", this.getLeftContext());
-			hm.put("rightContext", this.getRightContext());		
-			hm.put("head", this.getHead());
+			anno.set(Constants.HeadsAnnotation.class, Arrays.asList(new CoreLabel[]{head}));
 			
 			return anno;
 		}
 
+	}
+
+	@Override
+	public void loadCorpus(String corpusFile) throws IOException {
+		XMLInputFactory f = XMLInputFactory.newInstance();
+		try {
+			xmlReader = f.createXMLStreamReader(new FileInputStream(corpusFile));
+		} catch (XMLStreamException e) {
+			throw new IOException(e);
+		}		
+	}
+
+	@Override
+	public void loadAnswers(String answersFile) throws FileNotFoundException, IOException {
+		BufferedReader reader=null;
+		try{
+			reader = new BufferedReader(new FileReader(answersFile));
+			String line;
+			int offset=0;
+			while((line = reader.readLine())!=null){			
+				String[] entry = line.split("\\s+");
+				if(entry.length!=3){
+					throw new IOException(new ParseException("Answers file must have three fields per line",offset));
+				}
+				offset+=line.length();
+				answers.put(entry[1],entry[2]);
+			}
+		} finally {
+			if(reader!=null){
+				reader.close();
+			}
+		}
+		
 	}
 }

@@ -1,5 +1,11 @@
 package it.uniroma1.lcl.imms.feature;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Properties;
+import java.util.Set;
+
 import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
 import edu.stanford.nlp.ling.CoreLabel;
@@ -7,9 +13,7 @@ import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.pipeline.Annotator;
 import edu.stanford.nlp.util.CoreMap;
 import it.uniroma1.lcl.imms.Constants;
-import it.uniroma1.lcl.imms.Constants.HeadAnnotation;
-
-import java.util.*;
+import it.uniroma1.lcl.imms.Constants.HeadsAnnotation;
 
 public class SorroundingWordsFeaturizer implements Annotator {
 
@@ -335,8 +339,12 @@ public class SorroundingWordsFeaturizer implements Annotator {
 
 	@Override
 	public void annotate(Annotation annotation) {
-			
-		CoreLabel head = annotation.get(HeadAnnotation.class);
+		for(CoreLabel head : annotation.get(HeadsAnnotation.class)){
+			featurize(head, annotation);
+		}
+	}
+
+	private void featurize(CoreLabel head, Annotation annotation) {		
 		List<String> before = new ArrayList<String>();
 		List<String> after = new ArrayList<String>();
 				
@@ -360,6 +368,7 @@ public class SorroundingWordsFeaturizer implements Annotator {
 			features.add(new Feature<Boolean>("S_"+after.get(i),true));
 		}
 		head.get(Constants.FeaturesAnnotation.class).addAll(features);		
+		
 	}
 
 	boolean filter(CoreLabel token){

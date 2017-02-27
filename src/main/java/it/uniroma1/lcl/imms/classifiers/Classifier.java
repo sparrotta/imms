@@ -10,7 +10,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStreamWriter;
 import java.text.ParseException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,14 +18,16 @@ import java.util.Set;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-import edu.stanford.nlp.classify.Dataset;
-import edu.stanford.nlp.ling.CoreAnnotations.DocIDAnnotation;
+import edu.stanford.nlp.classify.RVFDataset;
 import edu.stanford.nlp.ling.CoreAnnotations.WordSenseAnnotation;
 import edu.stanford.nlp.ling.CoreLabel;
+import edu.stanford.nlp.ling.RVFDatum;
 import edu.stanford.nlp.pipeline.Annotation;
+import edu.stanford.nlp.stats.ClassicCounter;
+import edu.stanford.nlp.stats.Counter;
 import it.uniroma1.lcl.imms.Constants;
-import it.uniroma1.lcl.imms.Constants.HeadAnnotation;
-import it.uniroma1.lcl.imms.Constants.LexicalElementAnnotation;
+import it.uniroma1.lcl.imms.Constants.HeadsAnnotation;
+import it.uniroma1.lcl.imms.Constants.LexicalItemAnnotation;
 import it.uniroma1.lcl.imms.feature.Feature;
 
 public abstract class Classifier<M>  {
@@ -36,11 +37,13 @@ public abstract class Classifier<M>  {
 	public static final String CUSTOM_FEATURIZER_PREFIX = "customFeaturizerClass.";
 	private Properties properties;
 	
-
-	List<String> ids = new ArrayList<String>();
-	private Map<String, Dataset<String,Feature<?>>> datasets = new HashMap<String,Dataset<String,Feature<?>>>();
-	private Map<String, List<String>> idsMap = new HashMap<String,List<String>>();
+	private Map<String, RVFDataset<String,String>> datasets = new HashMap<String,RVFDataset<String,String>>();
+	
 	private Map<String,M> models = new HashMap<String,M>();
+
+	private String modelDir;
+
+	private String statDir;
 	
 	public Classifier(Properties properties) {
 		this.properties = properties;
@@ -49,54 +52,66 @@ public abstract class Classifier<M>  {
 	public Set<String> lexicalElements(){
 		return datasets.keySet();
 	}
+	
 	public void loadFromFiles(String lexElement, String modelDir, String statDir) throws FileNotFoundException, IOException, ParseException, ClassNotFoundException {	
 		readModel(lexElement, modelDir);
 		readStat(lexElement, statDir);
 	}
 	
-	public void add(Annotation anno, String modelDir, String statDir) {
-		String lexElement = anno.get(LexicalElementAnnotation.class);
-		Dataset d = datasets.get(lexElement);
-		if(d==null){			
-			try {
-				readModel(lexElement, modelDir);
-				readStat(lexElement,statDir);
-			} catch (ClassNotFoundException | IOException | ParseException e) {
-				throw new IllegalArgumentException("No suitable model or stat for lexical element: "+lexElement);
-			}
-		}		
-		List<String> ids = idsMap.get(lexElement);
-		if(ids==null){
-			ids = new ArrayList<String>();
-			idsMap.put(lexElement,ids);
+	
+	protected Double toDouble(Object o) {
+		Double d = 0.0;
+		if (o instanceof Boolean) {
+			d = ((Boolean) o) ? 1.0 : 0.0;
+		} else if (o instanceof Number) {
+			d = ((Number) o).doubleValue();
+		} else if (o instanceof String) {
+			d = Double.valueOf((String) o);
 		}
-		ids.add(anno.get(DocIDAnnotation.class));
-		CoreLabel head = anno.get(HeadAnnotation.class);		
-		d.add(head.get(Constants.FeaturesAnnotation.class), head.getString(WordSenseAnnotation.class));	
+		return d;
 	}
 	
-	public void add(Annotation anno) {
-		String lexElement = anno.get(LexicalElementAnnotation.class);
-		Dataset d = datasets.get(lexElement);
-		if(d==null){
-			d = new Dataset<>();
-			datasets.put(lexElement,d);
-		}		
-		List<String> ids = idsMap.get(lexElement);
-		if(ids==null){
-			ids = new ArrayList<String>();
-			idsMap.put(lexElement,ids);
+	public void add(Annotation anno) {						
+		for(CoreLabel head : anno.get(HeadsAnnotation.class)){
+			addDatum(head);
+		}				
+	}
+	
+	private void addDatum(CoreLabel head){
+		String lexElement = head.get(LexicalItemAnnotation.class);
+		if(!datasets.containsKey(lexElement)){
+			if(getModelDir()!=null && getStatDir()!=null){
+				try {
+					readModel(lexElement, getModelDir());
+					readStat(lexElement,getStatDir());
+				} catch (ClassNotFoundException | IOException | ParseException e) {
+					throw new IllegalArgumentException("No suitable model or stat for lexical element: "+lexElement);
+				}
+			} else {
+				datasets.put(lexElement,new RVFDataset<String,String>());
+			}						
 		}
-		ids.add(anno.get(DocIDAnnotation.class));
-		CoreLabel head = anno.get(HeadAnnotation.class);		
-		d.add(head.get(Constants.FeaturesAnnotation.class), head.getString(WordSenseAnnotation.class));	
+		RVFDataset<String,String> d = datasets.get(lexElement);
+		if(d==null){
+			throw new RuntimeException("No dataset available for lexical element: "+lexElement);
+			
+		}
+		List<Feature> features = head.get(Constants.FeaturesAnnotation.class);
+		Counter<String> counter = new ClassicCounter<String>();		
+		for(Feature feature : features){			
+			counter.incrementCount(feature.key(),toDouble(feature.value()));						
+		}				
+		String label = head.get(WordSenseAnnotation.class);
+		String src = head.get(Constants.DocSourceAnnotation.class);
+		
+		d.add(new RVFDatum<String,String>(counter, label),src,head.docID());
 	}
 	
 	public Properties getProperties() {
 		return properties;
 	}
 
-	public Dataset<String,Feature<?>> dataset(String lexElement){		
+	public RVFDataset<String,String> dataset(String lexElement){		
 		return datasets.get(lexElement);
 	}
 
@@ -105,10 +120,13 @@ public abstract class Classifier<M>  {
 	}
 	
 	
-	public List<String> ids(String lexElement){
-		return idsMap.get(lexElement);
+	public String src(String lexElement, int i){
+		return datasets.get(lexElement).getRVFDatumSource(i);
 	}
 	
+	public String id(String lexElement, int i){
+		return datasets.get(lexElement).getRVFDatumId(i);
+	}
 	
 	public void train(){
 		for(String lexElem :datasets.keySet()){
@@ -131,9 +149,9 @@ public abstract class Classifier<M>  {
 		this.models.put(lexElement, (M) ois.readObject());		
 	}
 	void readStat(String lexElement,String dir) throws FileNotFoundException, IOException, ParseException {
-		Dataset d = datasets.get(lexElement);
+		RVFDataset<String,String> d = datasets.get(lexElement);
 		if(d==null){
-			d = new Dataset();
+			d = new RVFDataset<String,String>();
 			datasets.put(lexElement, d);
 		}		
 		BufferedReader br = new BufferedReader(
@@ -153,7 +171,7 @@ public abstract class Classifier<M>  {
 			line = br.readLine(); 
 			if(line!=null){
 				for(String feat : line.split(sep)){
-					d.featureIndex.add(new Feature(feat,true));
+					d.featureIndex.add(feat);
 				}
 			} else {
 				throw new ParseException("Stat file bad format",offset);
@@ -161,6 +179,7 @@ public abstract class Classifier<M>  {
 		} finally{
 			br.close();
 		}
+		d.featureIndex().lock();
 	}
 
 	public void write(String outDir) throws IOException{
@@ -172,7 +191,7 @@ public abstract class Classifier<M>  {
 		}
 	}
 	void writeStat(String lexElement, String outDir) throws IOException {
-		Dataset<String,Feature<?>> d = datasets.get(lexElement);
+		RVFDataset<String,String> d = datasets.get(lexElement);
 		if(d==null){
 			return;
 		}
@@ -189,7 +208,7 @@ public abstract class Classifier<M>  {
 			if (i > 0) {
 				os.append(sep);
 			}
-			os.append(d.featureIndex.get(i).key());
+			os.append(d.featureIndex.get(i));
 		}
 		os.append("\n");
 		os.flush();
@@ -204,5 +223,21 @@ public abstract class Classifier<M>  {
 			oos.flush();
 			oos.close();
 		}
+	}
+
+	public String getModelDir() {
+		return modelDir;
+	}
+
+	public void setModelDir(String modelDir) {
+		this.modelDir = modelDir;
+	}
+
+	public String getStatDir() {
+		return statDir;
+	}
+
+	public void setStatDir(String statDir) {
+		this.statDir = statDir;
 	}
 }

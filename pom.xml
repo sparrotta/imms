@@ -20,10 +20,12 @@
 				<configuration>
 					<executable>java</executable>
 					<arguments>
+						<argument>-Xmx7168m</argument>
+						<argument>-XX:NewRatio=5</argument>
 						<argument>-classpath</argument>
 						<classpath />
-						<argument>it.uniroma1.lcl.imms.IMMSTester</argument>
-						<argument>test/propagate.v.test.xml</argument>
+						<argument>it.uniroma1.lcl.imms.IMMSTrainer</argument>
+						<argument>train/propagate.v.train.xml</argument>
 						<argument>train/propagate.v.train.key</argument>
 						<argument>out</argument>						
 					</arguments>

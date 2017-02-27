@@ -5,8 +5,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
-import java.util.function.Predicate;
-import java.util.regex.Pattern;
 
 import edu.stanford.nlp.ling.CoreAnnotations.CharacterOffsetBeginAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations.CharacterOffsetEndAnnotation;
@@ -17,7 +15,7 @@ import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.pipeline.Annotator;
 import edu.stanford.nlp.util.CoreMap;
 import it.uniroma1.lcl.imms.Constants;
-import it.uniroma1.lcl.imms.Constants.HeadAnnotation;
+import it.uniroma1.lcl.imms.Constants.HeadsAnnotation;
 
 public class POSFeaturizer implements Annotator {
 
@@ -31,7 +29,12 @@ public class POSFeaturizer implements Annotator {
 
 	@Override
 	public void annotate(Annotation annotation) {
-		CoreLabel head = annotation.get(HeadAnnotation.class);
+		for(CoreLabel head : annotation.get(HeadsAnnotation.class)){
+			featurize(head, annotation);
+		}
+	}
+
+	private void featurize(CoreLabel head, Annotation annotation) {
 		List<String> before = new ArrayList<String>();
 		List<String> after = new ArrayList<String>();
 		List<Feature> features = new ArrayList<Feature>();		
@@ -61,8 +64,8 @@ public class POSFeaturizer implements Annotator {
 		for(int i=0;i<Math.min(windowSize,afterSize);i++){
 			features.add(new Feature<Boolean>("P" + (i+1) + "_" + after.get(i), true));
 		}
-		head.get(Constants.FeaturesAnnotation.class).addAll(features);		
-
+		head.get(Constants.FeaturesAnnotation.class).addAll(features);	
+		
 	}
 
 	Feature posFeature(String tag, Integer position){		

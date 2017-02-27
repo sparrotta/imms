@@ -15,7 +15,7 @@ import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.pipeline.Annotator;
 import edu.stanford.nlp.util.CoreMap;
 import it.uniroma1.lcl.imms.Constants;
-import it.uniroma1.lcl.imms.Constants.HeadAnnotation;
+import it.uniroma1.lcl.imms.Constants.HeadsAnnotation;
 
 public class LocalCollocationFeaturizer implements Annotator {
 
@@ -27,8 +27,13 @@ public class LocalCollocationFeaturizer implements Annotator {
 	}
 
 	@Override
-	public void annotate(Annotation annotation) {
-		CoreLabel head = annotation.get(HeadAnnotation.class);
+	public void annotate(Annotation annotation) {		
+		for(CoreLabel head : annotation.get(HeadsAnnotation.class)){
+			featurize(head, annotation);
+		}
+	}
+	
+	void featurize(CoreLabel head, Annotation annotation){
 		List<CoreLabel> tokens = null;				 		
 		List<Feature> features = new ArrayList<Feature>();				
 		List<CoreMap> sentences = annotation.get(SentencesAnnotation.class);
@@ -66,9 +71,7 @@ public class LocalCollocationFeaturizer implements Annotator {
 				}
 			}
 		}
-		head.get(Constants.FeaturesAnnotation.class).addAll(features);
-		
-
+		head.get(Constants.FeaturesAnnotation.class).addAll(features);	
 	}
 
 	@Override

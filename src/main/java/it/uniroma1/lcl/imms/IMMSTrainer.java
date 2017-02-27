@@ -21,29 +21,34 @@ import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.pipeline.Annotation;
 import it.uniroma1.lcl.imms.classifiers.Classifier;
 import it.uniroma1.lcl.imms.classifiers.LibLinearClassifier;
-import it.uniroma1.lcl.imms.corpus.ICorpus;
-import it.uniroma1.lcl.imms.corpus.impl.SemevalLexicalCorpus;
+import it.uniroma1.lcl.imms.corpus.ICorpusReader;
+import it.uniroma1.lcl.imms.corpus.impl.SensEvalLexicalSampleCorpus;
 
 public class IMMSTrainer {
 
 	
-	private IMMSAnnotationPipeline pipeline;
+	private IMMSPipeline pipeline;
 	private Properties properties;
 
 	public IMMSTrainer(Properties props) {
 		this.properties = props;
-		this.pipeline = new IMMSAnnotationPipeline(props);		
+		this.pipeline = new IMMSPipeline(props);		
 	}
 
-	void doTrain(String trainFile) throws FileNotFoundException,XMLStreamException {
-		doTrain(new SemevalLexicalCorpus(trainFile));				
+	void doTrain(String trainFile) throws FileNotFoundException, IOException {
+		ICorpusReader cr = this.pipeline.getCorpusReader();
+		cr.loadCorpus(trainFile);		
+		doTrain(cr);				
 	}
-	void doTrain(String trainFile, String keyFile) throws XMLStreamException, IOException, java.text.ParseException {
-		doTrain(new SemevalLexicalCorpus(trainFile,keyFile));				
+	void doTrain(String trainFile, String keyFile) throws FileNotFoundException, IOException {
+		ICorpusReader cr = this.pipeline.getCorpusReader();
+		cr.loadCorpus(trainFile);
+		cr.loadAnswers(keyFile);
+		doTrain(cr);				
 	}
-	void doTrain(ICorpus corpusReader) throws FileNotFoundException,XMLStreamException {				
+	void doTrain(ICorpusReader corpusReader) {				
 		Iterator<Annotation> it = corpusReader.iterator();
-		Classifier classifier = new LibLinearClassifier(this.properties);
+		Classifier classifier = pipeline.getClassifier();
 		 
 		while (it.hasNext()) {
 			Annotation text = it.next();
@@ -117,10 +122,11 @@ public class IMMSTrainer {
 				+ "\t\tfile(default) train file trainPath\n";
 		Properties props = new Properties();
 		props.setProperty("outdir", "out");
-		props.setProperty("annotators", "tokenize, ssplit, pos, lemma, feat_sorround, feat_pos, feat_lcollocation");		
+		props.setProperty("feat_wordembed.file", "wordvectors.txt");
+		props.setProperty("annotators", "tokenize, ssplit, pos, lemma, feat_sorround, feat_pos, feat_lcollocation, feat_wordembed");		
 		try {
 			new IMMSTrainer(props).doTrain(trainXmlFilename,keyFilename);
-		} catch ( XMLStreamException | IOException | java.text.ParseException e) {
+		} catch ( IOException e) {
 			throw new RuntimeException(e);
 		}
 		

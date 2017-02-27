@@ -1,5 +1,6 @@
 package it.uniroma1.lcl.imms;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
@@ -20,47 +21,51 @@ import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.pipeline.Annotation;
 import it.uniroma1.lcl.imms.classifiers.Classifier;
 import it.uniroma1.lcl.imms.classifiers.LibLinearClassifier;
-import it.uniroma1.lcl.imms.corpus.ICorpus;
-import it.uniroma1.lcl.imms.corpus.impl.SemevalLexicalCorpus;
+import it.uniroma1.lcl.imms.corpus.ICorpusReader;
+import it.uniroma1.lcl.imms.corpus.impl.SensEvalLexicalSampleCorpus;
 
 public class IMMSTester {
 
 	
-	private IMMSAnnotationPipeline pipeline;
+	private IMMSPipeline pipeline;
 	private Properties properties;
 
 	public IMMSTester(Properties props) {
 		this.properties = props;
-		this.pipeline = new IMMSAnnotationPipeline(props);		
+		this.pipeline = new IMMSPipeline(props);		
 	}
 
 	
 
-	void doTest(String testFile) throws XMLStreamException, ClassNotFoundException, IOException, java.text.ParseException {
-		doTest(new SemevalLexicalCorpus(testFile));				
+	void doTest(String testFile) throws FileNotFoundException, IOException {
+		ICorpusReader cr = this.pipeline.getCorpusReader();
+		cr.loadCorpus(testFile);
+		doTest(cr);				
 	}
-	void doTest(String testFile, String keyFile) throws XMLStreamException, IOException, java.text.ParseException, ClassNotFoundException {
-		doTest(new SemevalLexicalCorpus(testFile,keyFile));				
+	void doTest(String testFile, String keyFile) throws FileNotFoundException, IOException {
+		ICorpusReader cr = this.pipeline.getCorpusReader();
+		cr.loadCorpus(testFile);
+		cr.loadAnswers(keyFile);
+		doTest(cr);				
 	}
-	void doTest(ICorpus corpusReader) throws XMLStreamException, ClassNotFoundException, IOException, java.text.ParseException {				
+	void doTest(ICorpusReader corpusReader) {				
 		Iterator<Annotation> it = corpusReader.iterator();
-		Classifier classifier = new LibLinearClassifier(properties);
-		String modelDir = properties.getProperty("modeldir");
-		String statDir = properties.getProperty("statdir");		
+		Classifier classifier = pipeline.getClassifier();
+		classifier.setModelDir(properties.getProperty("modeldir"));
+		classifier.setStatDir(properties.getProperty("statdir"));		
 		
 		while (it.hasNext()) {
 			Annotation text = it.next();
 			pipeline.annotate(text);
-			classifier.add(text,modelDir,statDir);
+			classifier.add(text);
 		}
 		
-		Map<String,List<String>> answersMap = classifier.test();		
-		for(Entry<String, List<String>>entry : answersMap.entrySet()){
+		Map<String,List<String>> lexElemAnswersMap = classifier.test();		
+		for(Entry<String, List<String>>entry : lexElemAnswersMap.entrySet()){
 			String lexElem = entry.getKey();
-			List<String> answers = entry.getValue();
-			List<String> ids = classifier.ids(lexElem);
+			List<String> answers = entry.getValue();			
 			for(int i=0; i<answers.size();i++){
-				System.out.println(ids.get(i)+" "+answers.get(i));
+				System.out.println(classifier.src(lexElem,i)+"\t"+classifier.id(lexElem,i)+"\t"+answers.get(i));
 			}
 		}
 	}
@@ -124,15 +129,13 @@ public class IMMSTester {
 		Properties props = new Properties();
 		props.setProperty("modeldir", "out");
 		props.setProperty("statdir", "out");
-		props.setProperty("annotators", "tokenize, ssplit, pos, lemma, feat_sorround, feat_pos, feat_lcollocation");		
+		props.setProperty("feat_wordembed.file", "wordvectors.txt");
+		props.setProperty("annotators", "tokenize, ssplit, pos, lemma, feat_sorround, feat_pos, feat_lcollocation, feat_wordembed");		
 		
-		try {
-			//TODO multiple models/stats for each lexical element 
+		try {			 
 			new IMMSTester(props).doTest(testPath);
-		} catch ( XMLStreamException | IOException | java.text.ParseException e) {
-			throw new RuntimeException(e);
-		} catch (ClassNotFoundException e) {
-			throw new RuntimeException(e);
+		} catch ( IOException e) {
+			throw new RuntimeException(e);		
 		}
 	}
 }
