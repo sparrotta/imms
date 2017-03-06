@@ -11,6 +11,7 @@ public class Feature<V> {
 	
 	public String key() {return key; }
 	public V value(){ return value; }
+	public String valueStr(){ return value.toString();}
 	
 	@Override
 	public int hashCode() {

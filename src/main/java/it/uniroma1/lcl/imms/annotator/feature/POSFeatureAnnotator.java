@@ -54,19 +54,19 @@ public class POSFeatureAnnotator implements Annotator {
 		}
 		if(tokens!=null){
 			Integer headIndex=head.index()-tokens.get(0).index();
-			features.add(new Feature<Boolean>("P0_"+head.tag(),true));
+			features.add(new Feature<String>("P0",head.tag()));
 			int position = 0;
 			for(int i=headIndex-1; i >= 0 && position < windowSize; i--){
 				CoreLabel token = tokens.get(i);
 //				if(Constants.PREDICATE_IS_WORD.test(token.lemma())){
-					features.add(new Feature<Boolean>("P-" + (++position) + "_" + token.lemma().toLowerCase().trim(), true));
+					features.add(new Feature<String>("P-" + (++position) , token.tag()));
 //				}					
 			}
 			position = 0;
 			for(int i=headIndex+1; i < tokens.size() && position < windowSize; i++){
 				CoreLabel token = tokens.get(i);
 //				if(Constants.PREDICATE_IS_WORD.test(token.lemma())){
-					features.add(new Feature<Boolean>("P" + (++position) + "_" + token.lemma().toLowerCase().trim(), true));
+					features.add(new Feature<String>("P" + (++position) , token.tag()));
 //				}					
 			}
 		}

@@ -50,10 +50,10 @@ public class LibLinearClassifier extends Classifier<Model> {
 
 	private Problem getProblem(String lexElement) {		
 		Problem prob = new Problem();
-		RVFDataset<String,String> d = dataset(lexElement);
+		IMMSDataset d = dataset(lexElement);
 		prob.bias = bias;	
-		prob.l = d.size();
-		prob.n = d.numFeatures() + (prob.bias >= 0 ? 1 : 0);
+		prob.l = d.size;
+		prob.n = d.featureIndex.size() + (prob.bias >= 0 ? 1 : 0);
 		prob.x = new Feature[prob.l][];
 		prob.y = new double[prob.l];
 
@@ -61,7 +61,7 @@ public class LibLinearClassifier extends Classifier<Model> {
 			RVFDatum<String, String> datum = d.getRVFDatum(i);
 			Collection<Feature> featureNodes = asFeatureNodes(datum.asFeaturesCounter(), d.featureIndex);			
 			prob.x[i] = featureNodes.toArray(new Feature[featureNodes.size()]);
-			prob.y[i] = d.labelIndex().indexOf(datum.label());
+			prob.y[i] = d.labelIndex.indexOf(datum.label());
 		}
 		
 		return prob;
@@ -95,16 +95,16 @@ public class LibLinearClassifier extends Classifier<Model> {
 
 	@Override
 	public List<String> test(String lexElem) {
-		RVFDataset<String,String> d = dataset(lexElem);
+		IMMSDataset d = dataset(lexElem);
 		
 		List<String> answers = new ArrayList<String>();
 				
-		for (int i = 0; i < d.size(); i++) {			
+		for (int i = 0; i < d.size; i++) {			
 			Collection<Feature> featureNodes = asFeatureNodes(d.getRVFDatum(i).asFeaturesCounter(), d.featureIndex);			
 			Feature[] instance =  featureNodes.toArray(new Feature[featureNodes.size()]);														
 			double answer = Linear.predict(model(lexElem), instance);			
 			
-			d.getLabelsArray()[i]=(new Double(answer).intValue());			
+			d.labels[i]=(new Double(answer).intValue());			
 			answers.add(d.labelIndex.get(new Double(answer).intValue()));			
 		}
 		return answers;

@@ -7,6 +7,7 @@ import java.util.Map;
 
 import edu.stanford.nlp.classify.RVFDataset;
 import edu.stanford.nlp.pipeline.Annotation;
+import it.uniroma1.lcl.imms.classifiers.IMMSDataset;
 
 public interface ITaskHandler {
 
@@ -15,7 +16,7 @@ public interface ITaskHandler {
 	
 	Iterator<Annotation> iterator();
 	
-	void writeResults(String property, String lexElem, RVFDataset<String,String> dataset);
+	void writeResults(String property, String lexElem, IMMSDataset dataset);
 	
 	Map<String,Double> evaluate(Map<String,RVFDataset<String,String>> datasets);
 }

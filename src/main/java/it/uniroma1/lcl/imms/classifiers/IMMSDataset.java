@@ -7,7 +7,6 @@ import java.util.Map;
 
 import edu.stanford.nlp.ling.RVFDatum;
 import edu.stanford.nlp.stats.ClassicCounter;
-import edu.stanford.nlp.stats.Counters;
 import edu.stanford.nlp.util.HashIndex;
 import edu.stanford.nlp.util.Index;
 import edu.stanford.nlp.util.Pair;
@@ -21,7 +20,7 @@ public class IMMSDataset {
 	public Index<String> labelIndex;
 	public Index<String> featureIndex;
 
-	Map<Integer, Index> featureValues;
+	Map<Integer, Index<String>> featureValuesMap;
 	protected int[] labels;
 	protected int[][] data;
 
@@ -34,7 +33,7 @@ public class IMMSDataset {
 	public IMMSDataset(int size) {
 		labelIndex = new HashIndex<>();
 		featureIndex = new HashIndex<>();
-		featureValues = new HashMap<Integer, Index>();
+		featureValuesMap = new HashMap<Integer, Index<String>>();
 		labels = new int[size];
 		data = new int[size][];
 		values = new double[size][];
@@ -90,14 +89,14 @@ public class IMMSDataset {
 		}
 		int fID = featureIndex.indexOf(feature.key());
 		if (fID > 0) {
-			Index featureValuesIndex = featureValues.get(fID);
+			Index<String> featureValuesIndex = featureValuesMap.get(fID);
 			if (featureValuesIndex == null) {
 				featureValuesIndex = new HashIndex<>();
-				featureValues.put(fID, featureValuesIndex);
+				featureValuesMap.put(fID, featureValuesIndex);
 			}
-			return featureValuesIndex.addToIndex(featureValue);
+			return 1+featureValuesIndex.addToIndex(featureValue.toString());
 		}
-		return -1;
+		return 0;
 	}
 
 	public RVFDatum<String, String> getRVFDatum(int index) {
@@ -116,6 +115,9 @@ public class IMMSDataset {
 		return sourcesAndIds.get(index).second();
 	}
 
+	public int size(){
+		return size;
+	}
 	public void add(Collection<Feature> features, String label, String src, String id) {
 		addLabel(label);
 		addFeatures(features);

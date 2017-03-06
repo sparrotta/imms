@@ -22,7 +22,6 @@ import java.util.zip.GZIPOutputStream;
 import edu.stanford.nlp.classify.RVFDataset;
 import edu.stanford.nlp.ling.CoreAnnotations.IDAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations.WordSenseAnnotation;
-import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.ling.RVFDatum;
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.stats.ClassicCounter;
@@ -43,8 +42,7 @@ public abstract class Classifier<M>  {
 	public static final String CUSTOM_FEATURIZER_PREFIX = "customFeaturizerClass.";
 	private Properties properties;
 	
-	private Map<String, RVFDataset<String,String>> datasets = new HashMap<String,RVFDataset<String,String>>();
-	private Map<String,Map<String,Index>> lexElementFeatureValueIndices = new HashMap<String,Map<String,Index>>();
+	private Map<String, IMMSDataset> datasets = new HashMap<String,IMMSDataset>();
 	
 	private Map<String,M> models = new HashMap<String,M>();
 
@@ -86,7 +84,7 @@ public abstract class Classifier<M>  {
 	
 	private void addDatum(CoreMap head){
 		String lexElement = head.get(LexicalItemAnnotation.class);
-		RVFDataset<String,String> d = datasets.get(lexElement);
+		IMMSDataset d = datasets.get(lexElement);
 		if(d==null){
 			if(getModelDir()!=null && getStatDir()!=null){
 				try {
@@ -94,13 +92,13 @@ public abstract class Classifier<M>  {
 					readStat(lexElement,getStatDir());
 					d = datasets.get(lexElement);
 					if(d!=null){
-						d.featureIndex().lock();
+						d.featureIndex.lock();
 					}
 				} catch (ClassNotFoundException | IOException | ParseException e) {
 					throw new IllegalArgumentException("No suitable model or stat for lexical element: "+lexElement);
 				}
 			} else {
-				d = new RVFDataset<String,String>();
+				d = new IMMSDataset();
 				datasets.put(lexElement,d);
 			}						
 		}
@@ -110,42 +108,16 @@ public abstract class Classifier<M>  {
 			
 		}
 		
-		Counter<String> counter = new ClassicCounter<String>();
-		for(Feature feature : head.get(FeaturesAnnotation.class)){
-			counter.setCount(feature.key(),toDouble(feature.value()));
-		}
+		Collection<Feature>features =  head.get(FeaturesAnnotation.class);
 		String label = head.get(WordSenseAnnotation.class);
 		String src = head.get(Constants.DocSourceAnnotation.class);
 		String id = head.get(IDAnnotation.class);
 		
-		d.add(new RVFDatum<String,String>(counter, label),src,id);
+		d.add(features,label,src,id);
 	}
 
-	protected Counter<String> asFeatureCounter(CoreMap head){
-		ClassicCounter<String> counter = new ClassicCounter<String>();
-		for(Feature feature : head.get(FeaturesAnnotation.class)){
-			counter.setCount(feature.key(), getFeatureValue(head.get(LexicalItemAnnotation.class),feature));
-		}
-		return counter;
-	}
 	
-	double getFeatureValue(String lexElem,Feature feature){		
-		Object featureValue = feature.value();		
-		if(featureValue instanceof Number){
-			return ((Number)featureValue).doubleValue();
-		}				
-		Map<String, Index> fvi = lexElementFeatureValueIndices.get(lexElem);
-		if(fvi==null){
-			fvi=new HashMap<String,Index>();
-			lexElementFeatureValueIndices.put(lexElem,fvi);
-		}
-		Index featureValuesIndex = fvi.get(feature.key());
-		if(!dataset(lexElem).featureIndex().isLocked() && featureValuesIndex==null){
-			featureValuesIndex=new HashIndex<>();
-			fvi.put(feature.key(), featureValuesIndex);			
-		}							
-		return featureValuesIndex == null ? -1.0 : featureValuesIndex.addToIndex(featureValue);
-	}
+	
 	
 	
 	public Properties getProperties() {
@@ -153,11 +125,11 @@ public abstract class Classifier<M>  {
 	}
 
 	
-	public RVFDataset<String,String> dataset(String lexElement){		
+	public IMMSDataset dataset(String lexElement){		
 		return datasets.get(lexElement);
 	}
 	
-	public Map<String,RVFDataset<String,String>> allDatasets(){		
+	public Map<String,IMMSDataset> allDatasets(){		
 		return datasets;
 	}
 
@@ -198,9 +170,9 @@ public abstract class Classifier<M>  {
 		this.models.put(lexElement, (M) ois.readObject());		
 	}
 	void readStat(String lexElement,String dir) throws FileNotFoundException, IOException, ParseException {
-		RVFDataset<String,String> d = datasets.get(lexElement);
+		IMMSDataset d = datasets.get(lexElement);
 		if(d==null){
-			d = new RVFDataset<String,String>();
+			d = new IMMSDataset();
 			datasets.put(lexElement, d);
 		}
 		
@@ -217,19 +189,25 @@ public abstract class Classifier<M>  {
 			} else {
 				throw new ParseException("Stat file empty",0);
 			}
-			offset = line.length();
-			line = br.readLine(); 
-			if(line!=null){
-				for(String feat : line.split(sep)){
-					d.featureIndex.add(feat);
+			while((line=br.readLine())!=null){
+				offset += line.length();
+				String[] featureValuesArr=line.split(sep);
+				int fID = d.featureIndex.addToIndex(featureValuesArr[0]);
+				Index featureValues = new HashIndex<>();
+				for(int i=1; i<featureValuesArr.length;i++){					
+					featureValues.add(featureValuesArr[i]);
 				}
-			} else {
-				throw new ParseException("Stat file bad format",offset);
+				d.featureValuesMap.put(fID, featureValues);					
+				featureValues.lock();
+				System.out.println(fID+": "+featureValues);
+			}						 
+			if(d.featureIndex.size()==0) {
+				throw new ParseException("Stat file bad format. Missing features",offset);
 			}
 		} finally{
 			br.close();
 		}
-		d.featureIndex().lock();
+		d.featureIndex.lock();
 	}
 
 	public void write(String modelDir,String statDir) throws IOException{		
@@ -241,7 +219,7 @@ public abstract class Classifier<M>  {
 		}
 	}
 	void writeStat(String lexElement, String outDir) throws IOException {
-		RVFDataset<String,String> d = datasets.get(lexElement);		
+		IMMSDataset d = datasets.get(lexElement);		
 		if(d==null){
 			return;
 		}
@@ -256,10 +234,17 @@ public abstract class Classifier<M>  {
 		os.append("\n");
 		for (int i = 0; i < d.featureIndex.size(); i++) {
 			String featureName = d.featureIndex.get(i);
-			if(i>0){os.append(sep);}
 			os.append(featureName);
+			Index featureValues = d.featureValuesMap.get(i);			
+			if(featureValues!=null){
+				for(int v=0; v<featureValues.size(); v++){
+					os.append("\t");
+					os.append(featureValues.get(v).toString());
+				}
+			}			
+			os.append("\n");
 		}	
-		os.append("\n");
+		
 		os.flush();
 		os.close();		
 	}

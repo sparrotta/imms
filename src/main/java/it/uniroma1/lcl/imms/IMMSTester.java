@@ -13,6 +13,7 @@ import edu.stanford.nlp.classify.RVFDataset;
 import edu.stanford.nlp.pipeline.Annotation;
 import it.uniroma1.lcl.imms.annotator.IMMSPipeline;
 import it.uniroma1.lcl.imms.classifiers.Classifier;
+import it.uniroma1.lcl.imms.classifiers.IMMSDataset;
 import it.uniroma1.lcl.imms.task.ITaskHandler;
 
 public class IMMSTester {
@@ -52,7 +53,7 @@ public class IMMSTester {
 		}
 		
 		classifier.test();		
-		for(Entry<String, RVFDataset<String, String>>entry : ((Map<String, RVFDataset<String,String>>)classifier.allDatasets()).entrySet()){						
+		for(Entry<String, IMMSDataset>entry : ((Map<String, IMMSDataset>)classifier.allDatasets()).entrySet()){						
 			taskHandler.writeResults(properties.getProperty(Constants.PROPERTY_TASK_RESULT_DIR),entry.getKey(),entry.getValue());
 		}
 		

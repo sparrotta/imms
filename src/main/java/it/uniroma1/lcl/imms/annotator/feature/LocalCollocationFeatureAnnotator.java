@@ -54,16 +54,19 @@ public class LocalCollocationFeatureAnnotator implements Annotator {
 				int start = Integer.parseInt(pair[0]);
 				int end = Integer.parseInt(pair[1]);
 				String key = "LC"+start+":"+end;
+				String value=null;
 				for(int i=headIndex+start;i<=headIndex+end;i++){
 					if(i==headIndex){
 						continue;
 					} else if(i>-1 && i<tokens.size()){
-						key+="_"+tokens.get(i).lemma();
+						value=value==null ? "" : value+"_";
+						value+=tokens.get(i).lemma();
 					} else {
-						key+="_^";
+						value=value==null ? "" : value+"_";
+						value+="^";
 					}
 				}
-				features.add(new Feature<Boolean>(key,true));
+				features.add(new Feature<String>(key,value));
 			}
 		}
 		return features;	
