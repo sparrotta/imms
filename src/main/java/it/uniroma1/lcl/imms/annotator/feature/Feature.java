@@ -1,4 +1,4 @@
-package it.uniroma1.lcl.imms.feature;
+package it.uniroma1.lcl.imms.annotator.feature;
 
 public class Feature<V> {
 

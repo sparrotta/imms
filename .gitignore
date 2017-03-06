@@ -3,9 +3,13 @@
 .project
 .settings/
 convertvec-master/
+in/
 out/
 target/
 test/
 train/
 wordvectors.txt
 wv/
+se2/
+*.bin
+

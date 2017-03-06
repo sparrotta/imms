@@ -1,4 +1,4 @@
-package it.uniroma1.lcl.imms.feature;
+package it.uniroma1.lcl.imms.annotator.feature;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -6,16 +6,20 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 
+import edu.stanford.nlp.ling.CoreAnnotations.IDAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
+import edu.stanford.nlp.ling.CoreAnnotations.TokenBeginAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
 import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.pipeline.Annotator;
+import edu.stanford.nlp.util.ArraySet;
 import edu.stanford.nlp.util.CoreMap;
 import it.uniroma1.lcl.imms.Constants;
+import it.uniroma1.lcl.imms.Constants.HeadTokenAnnotation;
 import it.uniroma1.lcl.imms.Constants.HeadsAnnotation;
 
-public class SorroundingWordsFeaturizer implements Annotator {
+public class SorroundingWordsFeatureAnnotator implements Annotator {
 
 
 	public static final String DEFAULT_WINDOWSIZE = "2";
@@ -26,7 +30,7 @@ public class SorroundingWordsFeaturizer implements Annotator {
 	List<String> stopWords = new ArrayList<String>();
 	
 	
-	public SorroundingWordsFeaturizer(Properties properties) {
+	public SorroundingWordsFeatureAnnotator(Properties properties) {
 		this.stopWords.add("a");
 		this.stopWords.add("about");
 		this.stopWords.add("above");
@@ -339,35 +343,32 @@ public class SorroundingWordsFeaturizer implements Annotator {
 
 	@Override
 	public void annotate(Annotation annotation) {
-		for(CoreLabel head : annotation.get(HeadsAnnotation.class)){
-			featurize(head, annotation);
+		for(CoreMap head : annotation.get(HeadsAnnotation.class)){			
+			head.get(Constants.FeaturesAnnotation.class).addAll(featurize(head.get(HeadTokenAnnotation.class), annotation));
 		}
 	}
 
-	private void featurize(CoreLabel head, Annotation annotation) {		
-		List<String> before = new ArrayList<String>();
-		List<String> after = new ArrayList<String>();
-				
-		List<CoreMap> sentences = annotation.get(SentencesAnnotation.class);
-		for (CoreMap sentence : sentences) {
-			for (CoreLabel token : sentence.get(TokensAnnotation.class)) {
-				if (token.endPosition() < head.beginPosition() && filter(token)) {
-					before.add(token.lemma().toLowerCase());									
-				} else if (token.beginPosition() > head.endPosition() && filter(token)) {
-					after.add(token.lemma().toLowerCase());					
-				}				
-			}
-		}
+	private List<Feature> featurize(CoreLabel head, Annotation annotation) {		
 		List<Feature> features = new ArrayList<Feature>();
-		int beforeSize = before.size();
-		for(int i=Math.max(0,beforeSize-windowSize); i<beforeSize; i++){
-			features.add(new Feature<Boolean>("S_"+before.get(i),true));
+		
+		int headIndex=head.index();
+		List<CoreLabel> tokens = annotation.get(TokensAnnotation.class);
+		int position = 0;
+		for(int i=headIndex-1; i >= 0 && position < windowSize; i--){
+			CoreLabel token = tokens.get(i);
+			if(filter(token)){
+				features.add(new Feature<Boolean>("S_" + token.lemma().toLowerCase().trim(), true));
+			}					
 		}
-		int afterSize = after.size();
-		for(int i=0;i<Math.min(windowSize,afterSize);i++){
-			features.add(new Feature<Boolean>("S_"+after.get(i),true));
+		position = 0;
+		for(int i=headIndex+1; i < tokens.size() && position < windowSize; i++){
+			CoreLabel token = tokens.get(i);
+			if(filter(token)){
+				features.add(new Feature<Boolean>("S_" + token.lemma().toLowerCase().trim(), true));
+			}					
 		}
-		head.get(Constants.FeaturesAnnotation.class).addAll(features);		
+		
+		return features;		
 		
 	}
 
@@ -376,12 +377,12 @@ public class SorroundingWordsFeaturizer implements Annotator {
 	}
 	@Override
 	public Set<Requirement> requirementsSatisfied() {
-		return Collections.singleton(Constants.IMMS_SRNDWORDS_REQUIREMENT);
+		return Collections.singleton(Constants.REQUIREMENT_ANNOTATOR_FEAT_IMMS_SRNDWORDS);
 	}
 
 	@Override
 	public Set<Requirement> requires() {
-		return TOKENIZE_SSPLIT_POS_LEMMA;
+		return Collections.unmodifiableSet(new ArraySet<>(TOKENIZE_REQUIREMENT, LEMMA_REQUIREMENT,Constants.REQUIREMENT_ANNOTATOR_IMMS_HEADTOKEN));
 	}
 
 }

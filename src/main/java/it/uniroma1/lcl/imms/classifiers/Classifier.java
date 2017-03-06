@@ -10,6 +10,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStreamWriter;
 import java.text.ParseException;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,16 +20,21 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import edu.stanford.nlp.classify.RVFDataset;
+import edu.stanford.nlp.ling.CoreAnnotations.IDAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations.WordSenseAnnotation;
 import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.ling.RVFDatum;
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.stats.ClassicCounter;
 import edu.stanford.nlp.stats.Counter;
+import edu.stanford.nlp.util.CoreMap;
+import edu.stanford.nlp.util.HashIndex;
+import edu.stanford.nlp.util.Index;
 import it.uniroma1.lcl.imms.Constants;
+import it.uniroma1.lcl.imms.Constants.FeaturesAnnotation;
 import it.uniroma1.lcl.imms.Constants.HeadsAnnotation;
 import it.uniroma1.lcl.imms.Constants.LexicalItemAnnotation;
-import it.uniroma1.lcl.imms.feature.Feature;
+import it.uniroma1.lcl.imms.annotator.feature.Feature;
 
 public abstract class Classifier<M>  {
 
@@ -38,6 +44,7 @@ public abstract class Classifier<M>  {
 	private Properties properties;
 	
 	private Map<String, RVFDataset<String,String>> datasets = new HashMap<String,RVFDataset<String,String>>();
+	private Map<String,Map<String,Index>> lexElementFeatureValueIndices = new HashMap<String,Map<String,Index>>();
 	
 	private Map<String,M> models = new HashMap<String,M>();
 
@@ -72,47 +79,86 @@ public abstract class Classifier<M>  {
 	}
 	
 	public void add(Annotation anno) {						
-		for(CoreLabel head : anno.get(HeadsAnnotation.class)){
+		for(CoreMap head : anno.get(HeadsAnnotation.class)){
 			addDatum(head);
 		}				
 	}
 	
-	private void addDatum(CoreLabel head){
+	private void addDatum(CoreMap head){
 		String lexElement = head.get(LexicalItemAnnotation.class);
-		if(!datasets.containsKey(lexElement)){
+		RVFDataset<String,String> d = datasets.get(lexElement);
+		if(d==null){
 			if(getModelDir()!=null && getStatDir()!=null){
 				try {
 					readModel(lexElement, getModelDir());
 					readStat(lexElement,getStatDir());
+					d = datasets.get(lexElement);
+					if(d!=null){
+						d.featureIndex().lock();
+					}
 				} catch (ClassNotFoundException | IOException | ParseException e) {
 					throw new IllegalArgumentException("No suitable model or stat for lexical element: "+lexElement);
 				}
 			} else {
-				datasets.put(lexElement,new RVFDataset<String,String>());
+				d = new RVFDataset<String,String>();
+				datasets.put(lexElement,d);
 			}						
 		}
-		RVFDataset<String,String> d = datasets.get(lexElement);
+		
 		if(d==null){
 			throw new RuntimeException("No dataset available for lexical element: "+lexElement);
 			
 		}
-		List<Feature> features = head.get(Constants.FeaturesAnnotation.class);
-		Counter<String> counter = new ClassicCounter<String>();		
-		for(Feature feature : features){			
-			counter.incrementCount(feature.key(),toDouble(feature.value()));						
-		}				
+		
+		Counter<String> counter = new ClassicCounter<String>();
+		for(Feature feature : head.get(FeaturesAnnotation.class)){
+			counter.setCount(feature.key(),toDouble(feature.value()));
+		}
 		String label = head.get(WordSenseAnnotation.class);
 		String src = head.get(Constants.DocSourceAnnotation.class);
+		String id = head.get(IDAnnotation.class);
 		
-		d.add(new RVFDatum<String,String>(counter, label),src,head.docID());
+		d.add(new RVFDatum<String,String>(counter, label),src,id);
 	}
+
+	protected Counter<String> asFeatureCounter(CoreMap head){
+		ClassicCounter<String> counter = new ClassicCounter<String>();
+		for(Feature feature : head.get(FeaturesAnnotation.class)){
+			counter.setCount(feature.key(), getFeatureValue(head.get(LexicalItemAnnotation.class),feature));
+		}
+		return counter;
+	}
+	
+	double getFeatureValue(String lexElem,Feature feature){		
+		Object featureValue = feature.value();		
+		if(featureValue instanceof Number){
+			return ((Number)featureValue).doubleValue();
+		}				
+		Map<String, Index> fvi = lexElementFeatureValueIndices.get(lexElem);
+		if(fvi==null){
+			fvi=new HashMap<String,Index>();
+			lexElementFeatureValueIndices.put(lexElem,fvi);
+		}
+		Index featureValuesIndex = fvi.get(feature.key());
+		if(!dataset(lexElem).featureIndex().isLocked() && featureValuesIndex==null){
+			featureValuesIndex=new HashIndex<>();
+			fvi.put(feature.key(), featureValuesIndex);			
+		}							
+		return featureValuesIndex == null ? -1.0 : featureValuesIndex.addToIndex(featureValue);
+	}
+	
 	
 	public Properties getProperties() {
 		return properties;
 	}
 
+	
 	public RVFDataset<String,String> dataset(String lexElement){		
 		return datasets.get(lexElement);
+	}
+	
+	public Map<String,RVFDataset<String,String>> allDatasets(){		
+		return datasets;
 	}
 
 	public M model(String lexElement){				
@@ -140,6 +186,9 @@ public abstract class Classifier<M>  {
 		}		
 		return answersMap;
 	}
+	
+
+
 	public abstract M train(String lexElem);
 	
 	public abstract List<String> test(String lexElem);
@@ -153,7 +202,8 @@ public abstract class Classifier<M>  {
 		if(d==null){
 			d = new RVFDataset<String,String>();
 			datasets.put(lexElement, d);
-		}		
+		}
+		
 		BufferedReader br = new BufferedReader(
 				new InputStreamReader(new GZIPInputStream(new FileInputStream(dir+fileSeparator+lexElement+".stat.gz"))));
 		String sep = "\t";
@@ -182,16 +232,16 @@ public abstract class Classifier<M>  {
 		d.featureIndex().lock();
 	}
 
-	public void write(String outDir) throws IOException{
-		for(String lexElem : datasets.keySet()){
-			writeStat(lexElem,outDir);
-		}
+	public void write(String modelDir,String statDir) throws IOException{		
 		for(String lexElem : models.keySet()){
-			writeModel(lexElem,outDir);
+			writeModel(lexElem,modelDir);
+		}
+		for(String lexElem : datasets.keySet()){
+			writeStat(lexElem,statDir);
 		}
 	}
 	void writeStat(String lexElement, String outDir) throws IOException {
-		RVFDataset<String,String> d = datasets.get(lexElement);
+		RVFDataset<String,String> d = datasets.get(lexElement);		
 		if(d==null){
 			return;
 		}
@@ -205,11 +255,10 @@ public abstract class Classifier<M>  {
 		}
 		os.append("\n");
 		for (int i = 0; i < d.featureIndex.size(); i++) {
-			if (i > 0) {
-				os.append(sep);
-			}
-			os.append(d.featureIndex.get(i));
-		}
+			String featureName = d.featureIndex.get(i);
+			if(i>0){os.append(sep);}
+			os.append(featureName);
+		}	
 		os.append("\n");
 		os.flush();
 		os.close();		

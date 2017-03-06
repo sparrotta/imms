@@ -24,10 +24,10 @@
 						<argument>-XX:NewRatio=5</argument>
 						<argument>-classpath</argument>
 						<classpath />
-						<argument>it.uniroma1.lcl.imms.IMMSTrainer</argument>
-						<argument>train/propagate.v.train.xml</argument>
-						<argument>train/propagate.v.train.key</argument>
-						<argument>out</argument>						
+						<argument>it.uniroma1.lcl.imms.IMMS</argument>						
+						<argument>-test</argument>																																											
+						<argument>in/eng-lex-samp.evaluation</argument>
+						<argument>in/eng-lex-sample.training</argument>
 					</arguments>
 				</configuration>
 			</plugin>

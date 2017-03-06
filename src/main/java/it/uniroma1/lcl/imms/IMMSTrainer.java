@@ -1,5 +1,7 @@
 package it.uniroma1.lcl.imms;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Iterator;
@@ -19,10 +21,11 @@ import org.apache.commons.cli.ParseException;
 
 import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.pipeline.Annotation;
+import it.uniroma1.lcl.imms.annotator.IMMSPipeline;
 import it.uniroma1.lcl.imms.classifiers.Classifier;
 import it.uniroma1.lcl.imms.classifiers.LibLinearClassifier;
-import it.uniroma1.lcl.imms.corpus.ICorpusReader;
-import it.uniroma1.lcl.imms.corpus.impl.SensEvalLexicalSampleCorpus;
+import it.uniroma1.lcl.imms.task.ITaskHandler;
+import it.uniroma1.lcl.imms.task.impl.SensEval2LexicalSampleTask;
 
 public class IMMSTrainer {
 
@@ -36,20 +39,20 @@ public class IMMSTrainer {
 	}
 
 	void doTrain(String trainFile) throws FileNotFoundException, IOException {
-		ICorpusReader cr = this.pipeline.getCorpusReader();
+		ITaskHandler cr = this.pipeline.getTaskHandler();
 		cr.loadCorpus(trainFile);		
 		doTrain(cr);				
 	}
 	void doTrain(String trainFile, String keyFile) throws FileNotFoundException, IOException {
-		ICorpusReader cr = this.pipeline.getCorpusReader();
+		ITaskHandler cr = this.pipeline.getTaskHandler();
 		cr.loadCorpus(trainFile);
 		cr.loadAnswers(keyFile);
 		doTrain(cr);				
 	}
-	void doTrain(ICorpusReader corpusReader) {				
+	void doTrain(ITaskHandler corpusReader) {				
 		Iterator<Annotation> it = corpusReader.iterator();
 		Classifier classifier = pipeline.getClassifier();
-		 
+		 int cnt=0;
 		while (it.hasNext()) {
 			Annotation text = it.next();
 			pipeline.annotate(text);						
@@ -57,46 +60,20 @@ public class IMMSTrainer {
 		}		
 		classifier.train();
 		try {
-			classifier.write(properties.getProperty("outdir"));
+			classifier.write(properties.getProperty(Constants.PROPERTY_CLASSIFIER_MODEL_DIR),properties.getProperty(Constants.PROPERTY_CLASSIFIER_STAT_DIR));
 		} catch (IOException e) {			
 			throw new RuntimeException(e);
 		}
 	}
 
 	
-	public static void main(String[] args) {
+	public static void main(String[] args) {	
+		
+		String trainFilename = args[0];
+		String keyFilename = trainFilename+".key";
 
-		Options options = new Options();
-
-		// Option input = new Option("i", "input", true, "input file path");
-		// input.setRequired(true);
-		// options.addOption(input);
-		//
-		// Option output = new Option("o", "output", true, "output file");
-		// output.setRequired(true);
-		// options.addOption(output);
-
-		CommandLineParser parser = new DefaultParser();
-		HelpFormatter formatter = new HelpFormatter();
-		CommandLine cmd;
-
-		try {
-			cmd = parser.parse(options, args);
-			if (cmd.getArgList().size() < 3) {
-				throw new ParseException("Missing file or output dir");
-			}
-		} catch (ParseException e) {
-			System.out.println(e.getMessage());
-			formatter.printHelp("imms train.xml train.key saveDir", options);
-			System.exit(1);
-			return;
-		}
-
-		String[] fileArgs = cmd.getArgs();
-		String trainXmlFilename = fileArgs[0];
-		String keyFilename = fileArgs[1];
-		String outputDir = fileArgs[2];
-
+		//Just as a reminder of original ims command line
+		//TODO porting from command line into properties
 		String generalOptions = "Usage: train.xml train.key saveDir\n"
 				+ "\t-i class name of Instance Extractor(default sg.edu.nus.comp.nlp.ims.instance.CInstanceExtractor)\n"
 				+ "\t-f class name of Feature Extractor(default sg.edu.nus.comp.nlp.ims.feature.CMixedFeatureExtractor)\n"
@@ -120,12 +97,19 @@ public class IMMSTrainer {
 				+ "\t\tdirectory train all xml files under directory trainPath\n"
 				+ "\t\tlist train all xml files listed in file trainPath\n"
 				+ "\t\tfile(default) train file trainPath\n";
-		Properties props = new Properties();
-		props.setProperty("outdir", "out");
-		props.setProperty("feat_wordembed.file", "wordvectors.txt");
-		props.setProperty("annotators", "tokenize, ssplit, pos, lemma, feat_sorround, feat_pos, feat_lcollocation, feat_wordembed");		
+		
+		
+		Properties props = new Properties(IMMS.defProps);
 		try {
-			new IMMSTrainer(props).doTrain(trainXmlFilename,keyFilename);
+			if(new File("imms.properties").exists()){
+				props.load(new FileInputStream("imms.properties"));			 
+			}
+			props.list(System.out);
+			if(new File(keyFilename).exists()){
+				new IMMSTrainer(props).doTrain(trainFilename,keyFilename);
+			} else {
+				new IMMSTrainer(props).doTrain(trainFilename);
+			}
 		} catch ( IOException e) {
 			throw new RuntimeException(e);
 		}

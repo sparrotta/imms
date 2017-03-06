@@ -1,28 +1,19 @@
 package it.uniroma1.lcl.imms;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Map.Entry;
+import java.util.Properties;
 
-import javax.xml.stream.XMLStreamException;
-
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.DefaultParser;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.Options;
-import org.apache.commons.cli.ParseException;
-
-import edu.stanford.nlp.ling.CoreLabel;
+import edu.stanford.nlp.classify.RVFDataset;
 import edu.stanford.nlp.pipeline.Annotation;
+import it.uniroma1.lcl.imms.annotator.IMMSPipeline;
 import it.uniroma1.lcl.imms.classifiers.Classifier;
-import it.uniroma1.lcl.imms.classifiers.LibLinearClassifier;
-import it.uniroma1.lcl.imms.corpus.ICorpusReader;
-import it.uniroma1.lcl.imms.corpus.impl.SensEvalLexicalSampleCorpus;
+import it.uniroma1.lcl.imms.task.ITaskHandler;
 
 public class IMMSTester {
 
@@ -38,21 +29,21 @@ public class IMMSTester {
 	
 
 	void doTest(String testFile) throws FileNotFoundException, IOException {
-		ICorpusReader cr = this.pipeline.getCorpusReader();
-		cr.loadCorpus(testFile);
-		doTest(cr);				
+		ITaskHandler th = this.pipeline.getTaskHandler();
+		th.loadCorpus(testFile);
+		doTest(th);				
 	}
 	void doTest(String testFile, String keyFile) throws FileNotFoundException, IOException {
-		ICorpusReader cr = this.pipeline.getCorpusReader();
-		cr.loadCorpus(testFile);
-		cr.loadAnswers(keyFile);
-		doTest(cr);				
+		ITaskHandler th = this.pipeline.getTaskHandler();
+		th.loadCorpus(testFile);
+		th.loadAnswers(keyFile);
+		doTest(th);				
 	}
-	void doTest(ICorpusReader corpusReader) {				
-		Iterator<Annotation> it = corpusReader.iterator();
+	void doTest(ITaskHandler taskHandler) {				
+		Iterator<Annotation> it = taskHandler.iterator();
 		Classifier classifier = pipeline.getClassifier();
-		classifier.setModelDir(properties.getProperty("modeldir"));
-		classifier.setStatDir(properties.getProperty("statdir"));		
+		classifier.setModelDir(properties.getProperty(Constants.PROPERTY_CLASSIFIER_MODEL_DIR));
+		classifier.setStatDir(properties.getProperty(Constants.PROPERTY_CLASSIFIER_STAT_DIR));		
 		
 		while (it.hasNext()) {
 			Annotation text = it.next();
@@ -60,50 +51,20 @@ public class IMMSTester {
 			classifier.add(text);
 		}
 		
-		Map<String,List<String>> lexElemAnswersMap = classifier.test();		
-		for(Entry<String, List<String>>entry : lexElemAnswersMap.entrySet()){
-			String lexElem = entry.getKey();
-			List<String> answers = entry.getValue();			
-			for(int i=0; i<answers.size();i++){
-				System.out.println(classifier.src(lexElem,i)+"\t"+classifier.id(lexElem,i)+"\t"+answers.get(i));
-			}
+		classifier.test();		
+		for(Entry<String, RVFDataset<String, String>>entry : ((Map<String, RVFDataset<String,String>>)classifier.allDatasets()).entrySet()){						
+			taskHandler.writeResults(properties.getProperty(Constants.PROPERTY_TASK_RESULT_DIR),entry.getKey(),entry.getValue());
 		}
+		
 	}
 	
-	public static void main(String[] args) {
-
-		Options options = new Options();
-
-		// Option input = new Option("i", "input", true, "input file path");
-		// input.setRequired(true);
-		// options.addOption(input);
-		//
-		// Option output = new Option("o", "output", true, "output file");
-		// output.setRequired(true);
-		// options.addOption(output);
-
-		CommandLineParser parser = new DefaultParser();
-		HelpFormatter formatter = new HelpFormatter();
-		CommandLine cmd;
-
-		try {
-			cmd = parser.parse(options, args);
-			if (cmd.getArgList().size() < 3) {
-				throw new ParseException("Missing file or output dir");
-			}
-		} catch (ParseException e) {
-			System.out.println(e.getMessage());
-			formatter.printHelp("imms train.xml train.key saveDir", options);
-			System.exit(1);
-			return;
-		}
-
-		String[] fileArgs = cmd.getArgs();
-		String testPath = fileArgs[0];
-		String modelDir = fileArgs[1];
-		String statDir = fileArgs[2];
-//		String saveDir = fileArgs[3];
-
+	public static void main(String[] args) {	
+		
+		String testFilename = args[0];
+		String keyFilename = testFilename+".key";
+		
+		//Just as a reminder of original ims command line
+		//TODO porting from command line into properties
 		String generalOptions = "Usage: testPath modelDir statisticDir saveDir\n"
 				+ "\t-i class name of Instance Extractor(default sg.edu.nus.comp.nlp.ims.instance.CInstanceExtractor)\n"
 				+ "\t-f class name of Feature Extractor(default sg.edu.nus.comp.nlp.ims.feature.CFeatureExtractorCombination)\n"
@@ -126,14 +87,18 @@ public class IMMSTester {
 				+ "\t\tdirectory: test all xml files under directory testPath\n"
 				+ "\t\tlist: test all files listed in file testPath\n"
 				+ "\t\tfile(default): test file testPath\n";
-		Properties props = new Properties();
-		props.setProperty("modeldir", "out");
-		props.setProperty("statdir", "out");
-		props.setProperty("feat_wordembed.file", "wordvectors.txt");
-		props.setProperty("annotators", "tokenize, ssplit, pos, lemma, feat_sorround, feat_pos, feat_lcollocation, feat_wordembed");		
 		
-		try {			 
-			new IMMSTester(props).doTest(testPath);
+		Properties props = new Properties(IMMS.defProps);
+		try {
+			if(new File("imms.properties").exists()){
+				props.load(new FileInputStream("imms.properties"));			 
+			}
+			props.list(System.out);
+			if(new File(keyFilename).exists()){
+				new IMMSTester(props).doTest(testFilename,keyFilename);
+			} else {
+				new IMMSTester(props).doTest(testFilename);
+			}
 		} catch ( IOException e) {
 			throw new RuntimeException(e);		
 		}

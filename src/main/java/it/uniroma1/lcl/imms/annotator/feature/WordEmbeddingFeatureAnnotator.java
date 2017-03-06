@@ -1,4 +1,4 @@
-package it.uniroma1.lcl.imms.feature;
+package it.uniroma1.lcl.imms.annotator.feature;
 
 import java.io.BufferedReader;
 import java.io.FileInputStream;
@@ -18,11 +18,13 @@ import edu.stanford.nlp.ling.CoreAnnotations;
 import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.pipeline.Annotator;
+import edu.stanford.nlp.util.ArraySet;
 import edu.stanford.nlp.util.CoreMap;
 import it.uniroma1.lcl.imms.Constants;
+import it.uniroma1.lcl.imms.Constants.HeadTokenAnnotation;
 import it.uniroma1.lcl.imms.Constants.HeadsAnnotation;
 
-public class WordEmbeddingFeaturizer implements Annotator {
+public class WordEmbeddingFeatureAnnotator implements Annotator {
 
 	public enum Strategies {
 		concatenation,
@@ -41,7 +43,7 @@ public class WordEmbeddingFeaturizer implements Annotator {
 	private Strategies strategy;
 	private double decay;
 
-	public WordEmbeddingFeaturizer(Properties properties) {
+	public WordEmbeddingFeatureAnnotator(Properties properties) {
 		BufferedReader reader = null;
 		try {
 
@@ -72,7 +74,7 @@ public class WordEmbeddingFeaturizer implements Annotator {
 				
 			}
 			vectorSize = wordMap.values().iterator().next().length;
-			System.out.println("\rReading word embeddings from "+filename+" ...done.");
+			System.out.print("\tdone.\n");
 			
 		} catch (FileNotFoundException e) {
 			throw new RuntimeException(e);
@@ -94,50 +96,45 @@ public class WordEmbeddingFeaturizer implements Annotator {
 
 	@Override
 	public void annotate(Annotation annotation) {
-		for(CoreLabel head : annotation.get(HeadsAnnotation.class)){
-			featurize(head, annotation);
+		for(CoreMap head : annotation.get(HeadsAnnotation.class)){
+			head.get(Constants.FeaturesAnnotation.class).addAll(featurize(head.get(HeadTokenAnnotation.class), annotation));
 		}
 	}
 
-	private void featurize(CoreLabel head, Annotation annotation) {
-		List<Feature> features;
-		switch(strategy){
-		case average: features = average(head, annotation);break;
+	private List<Feature> featurize(CoreLabel head, Annotation annotation) {
+		List<Feature> features=null;
+		switch(strategy){		
 		case concatenation: features = concatenation(head, annotation);break;
 		case exponential: features = exponential(head, annotation);break;
 		case fractional: features = fractional(head, annotation);
+		case average: 
+		default: features = average(head, annotation);
 		}
-		head.get(Constants.FeaturesAnnotation.class).addAll(average(head,annotation));			
+		return features;			
 	}
 	
 	private List<Feature> fractional(CoreLabel head, Annotation annotation) {
 		List<CoreLabel> tokens = annotation.get(CoreAnnotations.TokensAnnotation.class);
 		List<Feature> features = new ArrayList<Feature>();
-		Integer headIndex=null;
-		for(int i=0; i< tokens.size(); i++){
-			if(tokens.get(i).beginPosition()==head.beginPosition()){
-				headIndex=i;
-				break;
+		Integer headIndex=head.index();
+		
+		double[] v = new double[vectorSize];
+		for(int i=headIndex-windowSize; i<= headIndex+windowSize; i++){
+			if(i==headIndex){
+				continue;
+			} else if (i>-1 && i<tokens.size()){
+				String word = tokens.get(i).lemma().toLowerCase();
+				if(wordMap.containsKey(word)){							
+					for(int j=0; j<vectorSize; j++){								
+						v[j]+=wordMap.get(word)[j]*(windowSize-Math.abs(headIndex-i));						
+					}
+				}								
 			}
 		}
-		if(headIndex!=null){
-			double[] v = new double[vectorSize];
-			for(int i=headIndex-windowSize; i<= headIndex+windowSize; i++){
-				if(i==headIndex){
-					continue;
-				} else if (i>-1 && i<tokens.size()){
-					String word = tokens.get(i).lemma().toLowerCase();
-					if(wordMap.containsKey(word)){							
-						for(int j=0; j<vectorSize; j++){								
-							v[j]+=wordMap.get(word)[j]*(windowSize-Math.abs(headIndex-i));						
-						}
-					}								
-				}
-			}
-			for(int i=0; i < vectorSize; i++){
-				features.add(new Feature<Double>("WE_"+i,v[i]/windowSize));
-			}
+		for(int i=0; i < vectorSize; i++){
+			features.add(new Feature<Double>("WE_"+i,v[i]/windowSize));
 		}
+		
 		return features;
 
 	}
@@ -145,30 +142,22 @@ public class WordEmbeddingFeaturizer implements Annotator {
 	private List<Feature> exponential(CoreLabel head, Annotation annotation) {
 		List<CoreLabel> tokens = annotation.get(CoreAnnotations.TokensAnnotation.class);
 		List<Feature> features = new ArrayList<Feature>();
-		Integer headIndex=null;
-		for(int i=0; i< tokens.size(); i++){
-			if(tokens.get(i).beginPosition()==head.beginPosition()){
-				headIndex=i;
-				break;
+		Integer headIndex=head.index();
+		double[] v = new double[vectorSize];
+		for(int i=headIndex-windowSize; i<= headIndex+windowSize; i++){
+			if(i==headIndex){
+				continue;
+			} else if (i>-1 && i<tokens.size()){
+				String word = tokens.get(i).lemma().toLowerCase();
+				if(wordMap.containsKey(word)){							
+					for(int j=0; j<vectorSize; j++){								
+						v[j]+=wordMap.get(word)[j]*Math.pow(1-decay,Math.abs(headIndex-i)-1);						
+					}
+				}																	
 			}
 		}
-		if(headIndex!=null){
-			double[] v = new double[vectorSize];
-			for(int i=headIndex-windowSize; i<= headIndex+windowSize; i++){
-				if(i==headIndex){
-					continue;
-				} else if (i>-1 && i<tokens.size()){
-					String word = tokens.get(i).lemma().toLowerCase();
-					if(wordMap.containsKey(word)){							
-						for(int j=0; j<vectorSize; j++){								
-							v[j]+=wordMap.get(word)[j]*Math.pow(1-decay,Math.abs(headIndex-i)-1);						
-						}
-					}																	
-				}
-			}
-			for(int i=0; i < vectorSize; i++){
-				features.add(new Feature<Double>("WE_"+i,v[i]));
-			}
+		for(int i=0; i < vectorSize; i++){
+			features.add(new Feature<Double>("WE_"+i,v[i]));
 		}
 		return features;
 
@@ -177,30 +166,22 @@ public class WordEmbeddingFeaturizer implements Annotator {
 	private List<Feature> average(CoreLabel head, Annotation annotation) {
 		List<CoreLabel> tokens = annotation.get(CoreAnnotations.TokensAnnotation.class);
 		List<Feature> features = new ArrayList<Feature>();
-		Integer headIndex=null;
-		for(int i=0; i< tokens.size(); i++){
-			if(tokens.get(i).beginPosition()==head.beginPosition()){
-				headIndex=i;
-				break;
+		Integer headIndex=head.index();
+		double[] v = new double[vectorSize];
+		for(int i=headIndex-windowSize; i<= headIndex+windowSize; i++){
+			if(i==headIndex){
+				continue;
+			} else if (i>-1 && i<tokens.size()){
+				String word = tokens.get(i).lemma().toLowerCase();
+				if(wordMap.containsKey(word)){							
+					for(int j=0; j<vectorSize; j++){								
+						v[j]+=wordMap.get(word)[j];						
+					}
+				}																	
 			}
 		}
-		if(headIndex!=null){
-			double[] v = new double[vectorSize];
-			for(int i=headIndex-windowSize; i<= headIndex+windowSize; i++){
-				if(i==headIndex){
-					continue;
-				} else if (i>-1 && i<tokens.size()){
-					String word = tokens.get(i).lemma().toLowerCase();
-					if(wordMap.containsKey(word)){							
-						for(int j=0; j<vectorSize; j++){								
-							v[j]+=wordMap.get(word)[j];						
-						}
-					}																	
-				}
-			}
-			for(int i=0; i < vectorSize; i++){
-				features.add(new Feature<Double>("WE_"+i,v[i]/(2*windowSize)));
-			}
+		for(int i=0; i < vectorSize; i++){
+			features.add(new Feature<Double>("WE_"+i,v[i]/(2*windowSize)));
 		}
 		return features;
 
@@ -210,32 +191,24 @@ public class WordEmbeddingFeaturizer implements Annotator {
 		List<CoreLabel> tokens = annotation.get(CoreAnnotations.TokensAnnotation.class);
 		List<Feature> features = new ArrayList<Feature>();
 		
-		Integer headIndex=null;
-		for(int i=0; i< tokens.size(); i++){
-			if(tokens.get(i).beginPosition()==head.beginPosition()){
-				headIndex=i;
-				break;
-			}
-		}
-		if(headIndex!=null){
-			for(int i=headIndex-windowSize, slot=0; i<= headIndex+windowSize; i++){
-				if(i==headIndex){
-					continue;
-				} else {
-					for(int j=0, pos=slot*vectorSize; j<vectorSize; pos++,j++){
-						double value = 0.0;
-						if (i>-1 && i<tokens.size()){
-							String word = tokens.get(i).lemma().toLowerCase();
-							if(wordMap.containsKey(word)){
-								value = wordMap.get(word)[j];
-							}								
-						}						
-						features.add(new Feature<Double>("WE_"+pos,value));
-					}
+		Integer headIndex=head.index();
+		for(int i=headIndex-windowSize, slot=0; i<= headIndex+windowSize; i++){
+			if(i==headIndex){
+				continue;
+			} else {
+				for(int j=0, pos=slot*vectorSize; j<vectorSize; pos++,j++){
+					double value = 0.0;
+					if (i>-1 && i<tokens.size()){
+						String word = tokens.get(i).lemma().toLowerCase();
+						if(wordMap.containsKey(word)){
+							value = wordMap.get(word)[j];
+						}								
+					}						
+					features.add(new Feature<Double>("WE_"+pos,value));
 				}
-
-				slot++;
 			}
+
+			slot++;
 		}
 
 		return features;			
@@ -243,12 +216,12 @@ public class WordEmbeddingFeaturizer implements Annotator {
 
 	@Override
 	public Set<Requirement> requirementsSatisfied() {
-		return Collections.singleton(Constants.IMMS_WORDEMBED_REQUIREMENT);
+		return Collections.singleton(Constants.REQUIREMENT_ANNOTATOR_FEAT_IMMS_WORDEMBED);
 	}
 
 	@Override
 	public Set<Requirement> requires() {
-		return TOKENIZE_SSPLIT_POS_LEMMA;
+		return Collections.unmodifiableSet(new ArraySet<>(TOKENIZE_REQUIREMENT, SSPLIT_REQUIREMENT,LEMMA_REQUIREMENT,Constants.REQUIREMENT_ANNOTATOR_IMMS_HEADTOKEN));
 	}
 
 }

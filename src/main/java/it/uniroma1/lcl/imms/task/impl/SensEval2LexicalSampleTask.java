@@ -1,10 +1,12 @@
-package it.uniroma1.lcl.imms.corpus.impl;
+package it.uniroma1.lcl.imms.task.impl;
 
 import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,26 +19,77 @@ import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 
+import edu.stanford.nlp.classify.RVFDataset;
+import edu.stanford.nlp.ling.CoreAnnotations.IDAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations.WordSenseAnnotation;
 import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.pipeline.Annotation;
 import it.uniroma1.lcl.imms.Constants;
 import it.uniroma1.lcl.imms.Constants.DocSourceAnnotation;
 import it.uniroma1.lcl.imms.Constants.LexicalItemAnnotation;
-import it.uniroma1.lcl.imms.corpus.ICorpusReader;
-import it.uniroma1.lcl.imms.feature.Feature;
+import it.uniroma1.lcl.imms.annotator.feature.Feature;
+import it.uniroma1.lcl.imms.task.ITaskHandler;
 
-public class SensEvalLexicalSampleCorpus implements ICorpusReader {
+public class SensEval2LexicalSampleTask implements ITaskHandler {
 
 	XMLStreamReader xmlReader;
 	private Map<String, String> answers = new HashMap<String,String>();
 		
 	@Override
 	public Iterator<Annotation> iterator() {
-		return new SemevalTextIterator(xmlReader);
+		return new SensEval2LexicalSampleCorpusIterator(xmlReader);
 	}
 	
-	class SemevalTextIterator implements Iterator<Annotation> {
+	public void writeResults(String resultDir,String lexElem, RVFDataset<String,String> dataset){
+		String resultFilename = resultDir+Constants.fileSeparator+lexElem+".result";
+		OutputStreamWriter os =null;
+		try{
+			os = new OutputStreamWriter(new FileOutputStream(resultFilename));					
+			for(int i=0; i<dataset.size();i++){				
+				os.append(/*dataset.getRVFDatumSource(i)*/ lexElem.split("\\.")[0]+" "+dataset.getRVFDatumId(i)+" "+dataset.getRVFDatum(i).label()+"\n");
+			}		
+		} catch(IOException e){
+			throw new RuntimeException(e);
+		} finally {
+			if(os!=null){
+				try {
+					os.flush();
+					os.close();
+				} catch (IOException e) {					
+					e.printStackTrace();
+				}
+			}
+		}
+	}
+	
+	public Map<String,Double> evaluate(Map<String,RVFDataset<String,String>> datasets){		
+		double positive = 0.0;
+		double total = answers.size();		
+		double answered = 0.0;		
+		
+		for(RVFDataset<String, String> dataset: datasets.values()){									
+			for(int i=0; i<dataset.size(); i++){
+				++answered;
+				String id = dataset.getRVFDatumId(i);
+				String label = dataset.getDatum(i).label();
+				String answer = answers.get(id);
+				
+				positive += label.equals(answer) ? 1:0;
+			}						
+		}
+					
+		Map<String,Double>map = new HashMap<String,Double>();
+		map.put("total",total);
+		map.put("true_positive", positive);
+		map.put("precision", positive/answered);
+		map.put("recall", positive/total);
+		map.put("attempted", answered);
+		
+		return map;
+	}
+
+	
+	class SensEval2LexicalSampleCorpusIterator implements Iterator<Annotation> {
 
 		private static final String ELEMENT_CORPUS = "corpus";
 		private static final String ELEMENT_LEXELT = "lexelt";
@@ -53,7 +106,7 @@ public class SensEvalLexicalSampleCorpus implements ICorpusReader {
 		
 		private SenseEvalLexicalItemInstance instance;
 		
-		public SemevalTextIterator(XMLStreamReader xmlReader) {
+		public SensEval2LexicalSampleCorpusIterator(XMLStreamReader xmlReader) {
 			this.elementsStack = new Stack<String>();
 		}
 
@@ -100,7 +153,7 @@ public class SensEvalLexicalSampleCorpus implements ICorpusReader {
 						lang = xmlReader.getAttributeValue(null, "lang");
 						break;
 					case ELEMENT_LEXELT:
-						check(2, ELEMENT_CORPUS);
+						check(2, ELEMENT_CORPUS);						
 						item = xmlReader.getAttributeValue(null, "item");
 						pos = xmlReader.getAttributeValue(null, "pos");
 						break;
@@ -109,6 +162,7 @@ public class SensEvalLexicalSampleCorpus implements ICorpusReader {
 						String id = xmlReader.getAttributeValue(null, "id");
 						String docsrc = xmlReader.getAttributeValue(null, "docsrc");
 						String answer = xmlReader.getAttributeValue(null, "answer");
+						
 						if(answer==null){
 							answer = answers.get(id);
 						}
@@ -119,7 +173,9 @@ public class SensEvalLexicalSampleCorpus implements ICorpusReader {
 						return;
 					case ELEMENT_ANSWER:
 						check(4, ELEMENT_INSTANCE);
-						instance.headSense = xmlReader.getAttributeValue(null, "senseid");						
+						if(instance.headSense==null){
+							instance.headSense = xmlReader.getAttributeValue(null, "senseid");
+						}												
 						break;
 					case ELEMENT_CONTEXT:
 						check(4, ELEMENT_INSTANCE);
@@ -129,8 +185,8 @@ public class SensEvalLexicalSampleCorpus implements ICorpusReader {
 						break;
 					case ELEMENT_HEAD:
 						check(5, ELEMENT_CONTEXT);
-						if(instance.isHeadSet()){
-							throw new RuntimeException("Parser error: multiple target words for the same instance.");
+						if(instance.isHeadLocked()){
+							throw new RuntimeException("Parser error: multiple target words for the same instance: "+instance.toString());
 						}
 						break;
 					}
@@ -149,7 +205,9 @@ public class SensEvalLexicalSampleCorpus implements ICorpusReader {
 					case ELEMENT_HEAD:
 						if (instance.getHead().isEmpty()) {
 							throw new RuntimeException(
-									"Parser error: target word cannot be null");
+									"Parser error: head word cannot be null");
+						} else {
+							instance.lockHead();
 						}
 						break;
 					}
@@ -163,7 +221,11 @@ public class SensEvalLexicalSampleCorpus implements ICorpusReader {
 							instance.appendRightContext(xmlReader.getText());
 						}
 					} else if (ELEMENT_HEAD.equals(elementName)) {
-						instance.appendHead(xmlReader.getText());
+						if(!instance.isHeadLocked()){
+							instance.appendHead(xmlReader.getText());
+						} else {
+							instance.appendRightContext(xmlReader.getText());
+						}
 					}
 				}
 			}
@@ -191,16 +253,16 @@ public class SensEvalLexicalSampleCorpus implements ICorpusReader {
 	class SenseEvalLexicalItemInstance{
 
 		private String lang;
-		private String id;
-		private String item;
 		private String pos;
+		private String id;
+		private String item;		
 		private String docsrc;
 		private StringBuffer leftContext;
 		private StringBuffer head;
 		private StringBuffer rightContext;
 		
 		private boolean contextSet;
-		private boolean headSet;
+		private boolean headLock;
 		private String headSense;
 
 		public SenseEvalLexicalItemInstance(String headSense, String lang, String id, String item, String pos, String docsrc) {
@@ -213,6 +275,10 @@ public class SensEvalLexicalSampleCorpus implements ICorpusReader {
 			this.leftContext = new StringBuffer();
 			this.rightContext = new StringBuffer();
 			this.head = new StringBuffer();
+		}
+
+		public void lockHead() {
+			headLock = true;			
 		}
 
 		public String getLeftContext() {
@@ -237,8 +303,7 @@ public class SensEvalLexicalSampleCorpus implements ICorpusReader {
 			rightContext.append(text);
 		}
 
-		public void appendHead(String text) {
-			headSet = true;
+		public void appendHead(String text) {			
 			head.append(text);
 		}
 
@@ -246,8 +311,8 @@ public class SensEvalLexicalSampleCorpus implements ICorpusReader {
 			return contextSet;
 		}
 
-		public boolean isHeadSet() {
-			return headSet;
+		public boolean isHeadLocked() {
+			return headLock;
 		}
 		
 		@Override
@@ -256,12 +321,12 @@ public class SensEvalLexicalSampleCorpus implements ICorpusReader {
 		}
 		
 		Annotation toAnnotation(){
-			Annotation anno = new Annotation(this.getLeftContext()+this.getHead()+this.getRightContext());			
-						
+			Annotation anno = new Annotation(this.getLeftContext()+" "+this.getHead()+" "+this.getRightContext());			
+			
 			CoreLabel head = new CoreLabel();
-			head.setDocID(this.id);
-			head.setBeginPosition(this.getLeftContext().length());
-			head.setEndPosition(this.getLeftContext().length()+this.getHead().length());			
+			head.set(IDAnnotation.class,this.id);
+			head.setBeginPosition(this.getLeftContext().length()+1);
+			head.setEndPosition(this.getLeftContext().length()+1+this.getHead().length());			
 			head.set(DocSourceAnnotation.class, docsrc);
 			head.set(LexicalItemAnnotation.class,this.item);
 			head.set(WordSenseAnnotation.class, headSense==null ? Constants.UNKNOWN_SENSE : headSense);
@@ -277,6 +342,7 @@ public class SensEvalLexicalSampleCorpus implements ICorpusReader {
 	@Override
 	public void loadCorpus(String corpusFile) throws IOException {
 		XMLInputFactory f = XMLInputFactory.newInstance();
+//		f.setProperty(XMLInputFactory.IS_REPLACING_ENTITY_REFERENCES, false);
 		try {
 			xmlReader = f.createXMLStreamReader(new FileInputStream(corpusFile));
 		} catch (XMLStreamException e) {
@@ -293,10 +359,11 @@ public class SensEvalLexicalSampleCorpus implements ICorpusReader {
 			int offset=0;
 			while((line = reader.readLine())!=null){			
 				String[] entry = line.split("\\s+");
-				if(entry.length!=3){
-					throw new IOException(new ParseException("Answers file must have three fields per line",offset));
+				if(entry.length<3){
+					throw new IOException(new ParseException("Answers file must have at least three fields per line",offset));
 				}
 				offset+=line.length();
+				
 				answers.put(entry[1],entry[2]);
 			}
 		} finally {
