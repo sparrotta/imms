@@ -1,39 +1,22 @@
 package it.uniroma1.lcl.imms.classifiers;
 
-import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.OutputStreamWriter;
-import java.text.ParseException;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
-
-import edu.stanford.nlp.classify.RVFDataset;
 import edu.stanford.nlp.ling.CoreAnnotations.IDAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations.WordSenseAnnotation;
-import edu.stanford.nlp.ling.RVFDatum;
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.stats.ClassicCounter;
 import edu.stanford.nlp.stats.Counter;
 import edu.stanford.nlp.util.CoreMap;
-import edu.stanford.nlp.util.HashIndex;
-import edu.stanford.nlp.util.Index;
 import it.uniroma1.lcl.imms.Constants;
 import it.uniroma1.lcl.imms.Constants.FeaturesAnnotation;
 import it.uniroma1.lcl.imms.Constants.HeadsAnnotation;
 import it.uniroma1.lcl.imms.Constants.LexicalItemAnnotation;
 import it.uniroma1.lcl.imms.annotator.feature.Feature;
+
+import java.io.*;
+import java.text.ParseException;
+import java.util.*;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 public abstract class Classifier<M>  {
 
@@ -193,14 +176,12 @@ public abstract class Classifier<M>  {
 				offset += line.length();
 				String[] featureValuesArr=line.split(sep);
 				int fID = d.featureIndex.addToIndex(featureValuesArr[0]);
-				Index featureValues = new HashIndex<>();
+				Counter<String> featureValues = new ClassicCounter<String>();
 				for(int i=1; i<featureValuesArr.length;i++){					
-					featureValues.add(featureValuesArr[i]);
+					featureValues.incrementCount(featureValuesArr[i]);
 				}
 				d.featureValuesMap.put(fID, featureValues);					
-				featureValues.lock();
-				System.out.println(fID+": "+featureValues);
-			}						 
+			}
 			if(d.featureIndex.size()==0) {
 				throw new ParseException("Stat file bad format. Missing features",offset);
 			}
@@ -235,11 +216,11 @@ public abstract class Classifier<M>  {
 		for (int i = 0; i < d.featureIndex.size(); i++) {
 			String featureName = d.featureIndex.get(i);
 			os.append(featureName);
-			Index featureValues = d.featureValuesMap.get(i);			
+			Counter<String> featureValues = d.featureValuesMap.get(i);
 			if(featureValues!=null){
-				for(int v=0; v<featureValues.size(); v++){
+				for(String key : featureValues.keySet()){
 					os.append("\t");
-					os.append(featureValues.get(v).toString());
+					os.append(key);
 				}
 			}			
 			os.append("\n");

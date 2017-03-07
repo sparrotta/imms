@@ -1,37 +1,28 @@
 package it.uniroma1.lcl.imms.classifiers;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Properties;
-
-import de.bwaldvogel.liblinear.Feature;
-import de.bwaldvogel.liblinear.FeatureNode;
-import de.bwaldvogel.liblinear.Linear;
-import de.bwaldvogel.liblinear.Model;
-import de.bwaldvogel.liblinear.Parameter;
-import de.bwaldvogel.liblinear.Problem;
-import de.bwaldvogel.liblinear.SolverType;
-import edu.stanford.nlp.classify.RVFDataset;
+import de.bwaldvogel.liblinear.*;
 import edu.stanford.nlp.ling.RVFDatum;
 import edu.stanford.nlp.stats.Counter;
-import edu.stanford.nlp.util.CoreMap;
 import edu.stanford.nlp.util.Index;
 import it.uniroma1.lcl.imms.Constants;
-import it.uniroma1.lcl.imms.Constants.LexicalItemAnnotation;
+
+import java.util.*;
+import java.util.Map.Entry;
 
 public class LibLinearClassifier extends Classifier<Model> {
 	
 	static final String DEFAULT_BIAS = "-1.0";
-	Parameter parameter = new Parameter(SolverType.L2R_L2LOSS_SVC_DUAL, 1, Double.POSITIVE_INFINITY);
+	static final String DEFAULT_SOLVER = SolverType.L2R_L2LOSS_SVC_DUAL.name();
+
+	Parameter parameter;
 	private double bias;
 	
 	public LibLinearClassifier(Properties properties) {
 		super(properties);
 		bias = Double.parseDouble(getProperties().getProperty(Constants.PROPERTY_IMMS_LIBLINEAR_BIAS, DEFAULT_BIAS));
+		SolverType type = SolverType.valueOf((getProperties().getProperty(Constants.PROPERTY_IMMS_LIBLINEAR_SOLVER, DEFAULT_SOLVER)));
+		String eps = getProperties().getProperty(Constants.PROPERTY_IMMS_LIBLINEAR_SOLVER_EPS);
+		parameter = new Parameter(type, 1, eps!=null ? Double.parseDouble(eps) : Double.POSITIVE_INFINITY);
 	}
 
 	@Override
@@ -70,9 +61,9 @@ public class LibLinearClassifier extends Classifier<Model> {
 	Collection<Feature> asFeatureNodes(Counter<String> featuresCounter,Index featureIndex){
 		List<Feature> featureNodes = new ArrayList<Feature>();
 		for (Entry<String,Double> feature : featuresCounter.entrySet()) {
-			int featIndex = featureIndex.indexOf(feature.getKey());
-			if(featIndex>-1){
-				featureNodes.add(new FeatureNode(featIndex + 1, feature.getValue()));
+			int fID = featureIndex.indexOf(feature.getKey());
+			if(fID>-1){
+				featureNodes.add(new FeatureNode(fID+1, feature.getValue()));
 			}				
 		}
 		featureNodes.sort(new Comparator<Feature>() {

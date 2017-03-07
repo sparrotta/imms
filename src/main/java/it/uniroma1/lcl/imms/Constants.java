@@ -2,7 +2,6 @@ package it.uniroma1.lcl.imms;
 
 import edu.stanford.nlp.ling.CoreAnnotation;
 import edu.stanford.nlp.ling.CoreLabel;
-import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.pipeline.Annotator.Requirement;
 import edu.stanford.nlp.util.CoreMap;
 import edu.stanford.nlp.util.ErasureUtils;
@@ -53,6 +52,8 @@ public interface Constants {
 	public static final String PROPERTY_IMMS_WORDEMBED_FILE = ANNOTATOR_FEAT_IMMS_WORDEMBED + ".file";
 	public static final String PROPERTY_IMMS_WORDEMBED_STRATEGY = ANNOTATOR_FEAT_IMMS_WORDEMBED + ".strategy";
 	public static final String PROPERTY_IMMS_LIBLINEAR_BIAS = CLASSIFIER_IMMS_LIBLINEAR + ".bias";
+	public static final String PROPERTY_IMMS_LIBLINEAR_SOLVER = CLASSIFIER_IMMS_LIBLINEAR + ".solver";
+	public static final String PROPERTY_IMMS_LIBLINEAR_SOLVER_EPS = CLASSIFIER_IMMS_LIBLINEAR + ".solver.eps";
 
 	public static class FeaturesAnnotation implements CoreAnnotation<List<Feature>> {
 		public Class<List<Feature>> getType() {
