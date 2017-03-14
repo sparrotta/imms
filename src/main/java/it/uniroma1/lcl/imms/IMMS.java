@@ -11,7 +11,9 @@ public class IMMS {
 		defProps.setProperty(Constants.PROPERTY_CLASSIFIER_STAT_DIR, "out");
 		defProps.setProperty(Constants.PROPERTY_TASK_RESULT_DIR, "out");
 		defProps.setProperty(Constants.PROPERTY_IMMS_WORDEMBED_FILE, "wordvectors.txt");
-		defProps.setProperty("annotators", "tokenize, ssplit, pos, lemma, "+Constants.ANNOTATOR_FEAT_IMMS_SRNDWORDS+", "+Constants.ANNOTATOR_FEAT_IMMS_POS+", "+Constants.ANNOTATOR_FEAT_IMMS_LCOLLOCATION+", "+Constants.ANNOTATOR_FEAT_IMMS_WORDEMBED);		
+		defProps.setProperty(Constants.PROPERTY_IMMS_WORDEMBED_STRATEGY, "concatenation");
+		defProps.setProperty(Constants.PROPERTY_IMMS_WORDEMBED_SIGMA, "0.1");
+		defProps.setProperty("annotators", "tokenize, ssplit, pos, lemma, "+Constants.ANNOTATOR_IMMS_HEADTOKEN+", "+Constants.ANNOTATOR_FEAT_IMMS_SRNDWORDS+", "+Constants.ANNOTATOR_FEAT_IMMS_POS+", "+Constants.ANNOTATOR_FEAT_IMMS_LCOLLOCATION+", "+Constants.ANNOTATOR_FEAT_IMMS_WORDEMBED);		
 	}
 	
 	public static void main(String[] args) {

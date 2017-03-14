@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.DoubleSummaryStatistics;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
@@ -16,6 +17,9 @@ import java.util.Set;
 
 import edu.stanford.nlp.ling.CoreAnnotations;
 import edu.stanford.nlp.ling.CoreLabel;
+import edu.stanford.nlp.ling.CoreAnnotations.SentenceIndexAnnotation;
+import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
+import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.pipeline.Annotator;
 import edu.stanford.nlp.util.ArraySet;
@@ -34,7 +38,9 @@ public class WordEmbeddingFeatureAnnotator implements Annotator {
 	}
 	
 	public static final String DEFAULT_WINDOWSIZE = "10";
-	public static final String DEFAULT_STRATEGY = "exponential";
+	public static final String DEFAULT_STRATEGY = "concatenation";
+	public static final String DEFAULT_SENTENCEBOUND = "false";
+	public static final String DEFAULT_SIGMA = "0";
 	
 	Map<String,double[]> wordMap = new HashMap<String, double[]>();
 	protected int vectorSize = -1;
@@ -42,8 +48,15 @@ public class WordEmbeddingFeatureAnnotator implements Annotator {
 	Integer windowSize;
 	private Strategies strategy;
 	private double decay;
+	private double sigma;
+	private boolean sentenceBound;
 
 	public WordEmbeddingFeatureAnnotator(Properties properties) {
+		windowSize = Integer.valueOf(properties.getProperty(Constants.PROPERTY_IMMS_WORDEMBED_WINDOWSIZE,DEFAULT_WINDOWSIZE));
+		decay = 1 - Math.pow(0.1,(windowSize-1)*-1);
+		strategy = Strategies.valueOf(Strategies.class,properties.getProperty(Constants.PROPERTY_IMMS_WORDEMBED_STRATEGY,DEFAULT_STRATEGY));
+		sigma = Double.valueOf(properties.getProperty(Constants.PROPERTY_IMMS_WORDEMBED_SIGMA,DEFAULT_SIGMA));
+		sentenceBound = Boolean.valueOf(properties.getProperty(Constants.PROPERTY_IMMS_WORDEMBED_SENTENCEBOUND,DEFAULT_SENTENCEBOUND));
 		BufferedReader reader = null;
 		try {
 
@@ -64,17 +77,42 @@ public class WordEmbeddingFeatureAnnotator implements Annotator {
 					String array[] = actualLine.split("\\s");
 					double vector[] = new double[array.length - 1];
 					for (int i = 0; i < vector.length; i++) {
-						vector[i] = Double.parseDouble(array[i + 1]);
+						vector[i] = Double.parseDouble(array[i + 1]);						
 					}
-					wordMap.put(array[0].trim().toLowerCase(), vector);
+//					wordMap.put(array[0].trim().toLowerCase(), vector);
+					wordMap.put(array[0], vector);
 				} catch (Exception e) {
 					// corrupted line
 					System.err.println("Corrupted line: " + line);
 				}
 				
 			}
+			
 			vectorSize = wordMap.values().iterator().next().length;
-			System.out.print("\tdone.\n");
+			System.out.print(" done. Vectors dimension: "+vectorSize+"\n");
+			if(sigma>0){
+				System.out.print("Scaling word embeddings vectors...");
+				double [] mean = new double[vectorSize];
+				double [] variance = new double[vectorSize];
+				for(double[] wordVect : wordMap.values()){
+					for(int i=0; i < wordVect.length; i++){
+						mean[i]+=wordVect[i]/wordMap.size();
+					}
+				}			
+				for(double[] wordVect : wordMap.values()){
+					for(int i=0; i < wordVect.length; i++){
+						variance[i]+=Math.pow(wordVect[i]-mean[i],2)/wordMap.size();
+					}
+				}			
+				for(double[] wordVect : wordMap.values()){				
+					for(int i=0; i < wordVect.length; i++){
+						wordVect[i]=(sigma/Math.sqrt(variance[i]))*wordVect[i];					
+					}				
+				}
+				System.out.print("done.\n");
+			}
+			
+			
 			
 		} catch (FileNotFoundException e) {
 			throw new RuntimeException(e);
@@ -89,9 +127,8 @@ public class WordEmbeddingFeatureAnnotator implements Annotator {
 				}
 			}
 		}
-		windowSize = Integer.valueOf(properties.getProperty(Constants.PROPERTY_IMMS_WORDEMBED_WINDOWSIZE,DEFAULT_WINDOWSIZE));
-		decay = 1 - Math.pow(0.1,1/windowSize-1);
-		strategy = Strategies.valueOf(Strategies.class,properties.getProperty(Constants.PROPERTY_IMMS_WORDEMBED_STRATEGY,DEFAULT_STRATEGY));
+		
+		
 	}
 
 	@Override
@@ -101,22 +138,37 @@ public class WordEmbeddingFeatureAnnotator implements Annotator {
 		}
 	}
 
-	private List<Feature> featurize(CoreLabel head, Annotation annotation) {
+	private List<Feature> featurize(CoreLabel head, Annotation annotation) {						
+		List<CoreMap> sentences = annotation.get(SentencesAnnotation.class);
+		List<CoreLabel> tokens = null;
+		if(sentenceBound){
+			for (CoreMap sentence : sentences) {
+				if(sentence.get(SentenceIndexAnnotation.class)==head.sentIndex()){			
+					tokens = sentence.get(TokensAnnotation.class);
+					break;
+				}								
+			}
+		} else {
+			tokens = annotation.get(TokensAnnotation.class);
+		}
+		
 		List<Feature> features=null;
-		switch(strategy){		
-		case concatenation: features = concatenation(head, annotation);break;
-		case exponential: features = exponential(head, annotation);break;
-		case fractional: features = fractional(head, annotation);
-		case average: 
-		default: features = average(head, annotation);
+		if(tokens!=null){
+			switch(strategy){		
+			case concatenation: features = concatenation(head, tokens);break;
+			case exponential: features = exponential(head, tokens);break;
+			case fractional: features = fractional(head, tokens);
+			case average: 
+			default: features = average(head, tokens);
+			}
 		}
 		return features;			
 	}
 	
-	private List<Feature> fractional(CoreLabel head, Annotation annotation) {
-		List<CoreLabel> tokens = annotation.get(CoreAnnotations.TokensAnnotation.class);
+	private List<Feature> fractional(CoreLabel head, List<CoreLabel> tokens) {
+		
 		List<Feature> features = new ArrayList<Feature>();
-		Integer headIndex=head.index();
+		Integer headIndex=head.index()-tokens.get(0).index();
 		
 		double[] v = new double[vectorSize];
 		for(int i=headIndex-windowSize; i<= headIndex+windowSize; i++){
@@ -139,10 +191,9 @@ public class WordEmbeddingFeatureAnnotator implements Annotator {
 
 	}
 	
-	private List<Feature> exponential(CoreLabel head, Annotation annotation) {
-		List<CoreLabel> tokens = annotation.get(CoreAnnotations.TokensAnnotation.class);
+	private List<Feature> exponential(CoreLabel head, List<CoreLabel> tokens) {
 		List<Feature> features = new ArrayList<Feature>();
-		Integer headIndex=head.index();
+		Integer headIndex=head.index()-tokens.get(0).index();
 		double[] v = new double[vectorSize];
 		for(int i=headIndex-windowSize; i<= headIndex+windowSize; i++){
 			if(i==headIndex){
@@ -163,10 +214,10 @@ public class WordEmbeddingFeatureAnnotator implements Annotator {
 
 	}
 	
-	private List<Feature> average(CoreLabel head, Annotation annotation) {
-		List<CoreLabel> tokens = annotation.get(CoreAnnotations.TokensAnnotation.class);
+	private List<Feature> average(CoreLabel head, List<CoreLabel> tokens) {
+		
 		List<Feature> features = new ArrayList<Feature>();
-		Integer headIndex=head.index();
+		Integer headIndex=head.index() - tokens.get(0).index();
 		double[] v = new double[vectorSize];
 		for(int i=headIndex-windowSize; i<= headIndex+windowSize; i++){
 			if(i==headIndex){
@@ -187,11 +238,10 @@ public class WordEmbeddingFeatureAnnotator implements Annotator {
 
 	}
 	
-	private List<Feature> concatenation(CoreLabel head, Annotation annotation) {
-		List<CoreLabel> tokens = annotation.get(CoreAnnotations.TokensAnnotation.class);
+	private List<Feature> concatenation(CoreLabel head, List<CoreLabel> tokens) {		
 		List<Feature> features = new ArrayList<Feature>();
 		
-		Integer headIndex=head.index();
+		Integer headIndex=head.index()-tokens.get(0).index();
 		for(int i=headIndex-windowSize, slot=0; i<= headIndex+windowSize; i++){
 			if(i==headIndex){
 				continue;
@@ -199,7 +249,7 @@ public class WordEmbeddingFeatureAnnotator implements Annotator {
 				for(int j=0, pos=slot*vectorSize; j<vectorSize; pos++,j++){
 					double value = 0.0;
 					if (i>-1 && i<tokens.size()){
-						String word = tokens.get(i).lemma().toLowerCase();
+						String word = tokens.get(i).lemma();
 						if(wordMap.containsKey(word)){
 							value = wordMap.get(word)[j];
 						}								

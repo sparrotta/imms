@@ -28,6 +28,7 @@ import it.uniroma1.lcl.imms.Constants;
 import it.uniroma1.lcl.imms.Constants.DocSourceAnnotation;
 import it.uniroma1.lcl.imms.Constants.LexicalItemAnnotation;
 import it.uniroma1.lcl.imms.annotator.feature.Feature;
+import it.uniroma1.lcl.imms.classifiers.IMMSDataset;
 import it.uniroma1.lcl.imms.task.ITaskHandler;
 
 public class SensEval2LexicalSampleTask implements ITaskHandler {

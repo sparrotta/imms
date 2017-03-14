@@ -7,6 +7,7 @@ import java.util.Map;
 
 import edu.stanford.nlp.classify.RVFDataset;
 import edu.stanford.nlp.pipeline.Annotation;
+import it.uniroma1.lcl.imms.classifiers.IMMSDataset;
 
 public interface ITaskHandler {
 

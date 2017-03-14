@@ -36,6 +36,10 @@ public class IMMSAnnotatorImplementations extends AnnotatorImplementations {
 		return new OpenNlpTokenizeAnnotator(properties);
 	}
 
+	public Annotator wordnetLemmatizer(Properties properties) {		
+		return new WordNetLemmaAnnotator(properties);
+	}
+	
 	public Annotator headToken(Properties properties) {		
 		return new HeadTokenAnnotator(properties);
 	}

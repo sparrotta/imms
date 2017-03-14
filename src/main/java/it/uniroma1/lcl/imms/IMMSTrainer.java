@@ -21,8 +21,10 @@ import org.apache.commons.cli.ParseException;
 
 import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.pipeline.Annotation;
+import edu.stanford.nlp.util.Index;
 import it.uniroma1.lcl.imms.annotator.IMMSPipeline;
 import it.uniroma1.lcl.imms.classifiers.Classifier;
+import it.uniroma1.lcl.imms.classifiers.IMMSDataset;
 import it.uniroma1.lcl.imms.classifiers.LibLinearClassifier;
 import it.uniroma1.lcl.imms.task.ITaskHandler;
 import it.uniroma1.lcl.imms.task.impl.SensEval2LexicalSampleTask;
@@ -59,6 +61,7 @@ public class IMMSTrainer {
 			classifier.add(text);			
 		}		
 		classifier.train();
+	
 		try {
 			classifier.write(properties.getProperty(Constants.PROPERTY_CLASSIFIER_MODEL_DIR),properties.getProperty(Constants.PROPERTY_CLASSIFIER_STAT_DIR));
 		} catch (IOException e) {			

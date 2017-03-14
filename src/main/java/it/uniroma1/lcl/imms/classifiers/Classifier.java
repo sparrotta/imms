@@ -43,8 +43,7 @@ public abstract class Classifier<M>  {
 	public static final String CUSTOM_FEATURIZER_PREFIX = "customFeaturizerClass.";
 	private Properties properties;
 	
-	private Map<String, RVFDataset<String,String>> datasets = new HashMap<String,RVFDataset<String,String>>();
-	private Map<String,Map<String,Index>> lexElementFeatureValueIndices = new HashMap<String,Map<String,Index>>();
+	private Map<String, RVFDataset<String,String>> datasets = new HashMap<String,RVFDataset<String,String>>();	
 	
 	private Map<String,M> models = new HashMap<String,M>();
 
@@ -92,10 +91,7 @@ public abstract class Classifier<M>  {
 				try {
 					readModel(lexElement, getModelDir());
 					readStat(lexElement,getStatDir());
-					d = datasets.get(lexElement);
-					if(d!=null){
-						d.featureIndex().lock();
-					}
+					d = datasets.get(lexElement);					
 				} catch (ClassNotFoundException | IOException | ParseException e) {
 					throw new IllegalArgumentException("No suitable model or stat for lexical element: "+lexElement);
 				}
@@ -120,33 +116,6 @@ public abstract class Classifier<M>  {
 		
 		d.add(new RVFDatum<String,String>(counter, label),src,id);
 	}
-
-	protected Counter<String> asFeatureCounter(CoreMap head){
-		ClassicCounter<String> counter = new ClassicCounter<String>();
-		for(Feature feature : head.get(FeaturesAnnotation.class)){
-			counter.setCount(feature.key(), getFeatureValue(head.get(LexicalItemAnnotation.class),feature));
-		}
-		return counter;
-	}
-	
-	double getFeatureValue(String lexElem,Feature feature){		
-		Object featureValue = feature.value();		
-		if(featureValue instanceof Number){
-			return ((Number)featureValue).doubleValue();
-		}				
-		Map<String, Index> fvi = lexElementFeatureValueIndices.get(lexElem);
-		if(fvi==null){
-			fvi=new HashMap<String,Index>();
-			lexElementFeatureValueIndices.put(lexElem,fvi);
-		}
-		Index featureValuesIndex = fvi.get(feature.key());
-		if(!dataset(lexElem).featureIndex().isLocked() && featureValuesIndex==null){
-			featureValuesIndex=new HashIndex<>();
-			fvi.put(feature.key(), featureValuesIndex);			
-		}							
-		return featureValuesIndex == null ? -1.0 : featureValuesIndex.addToIndex(featureValue);
-	}
-	
 	
 	public Properties getProperties() {
 		return properties;
@@ -229,7 +198,7 @@ public abstract class Classifier<M>  {
 		} finally{
 			br.close();
 		}
-		d.featureIndex().lock();
+		d.featureIndex.lock();
 	}
 
 	public void write(String modelDir,String statDir) throws IOException{		

@@ -29,8 +29,7 @@ public class IMMSPipeline extends StanfordCoreNLP {
 		AnnotatorPool superPool = super.getDefaultAnnotatorPool(inputProps, annotatorImplementation);
 		
 		superPool.register(Constants.ANNOTATOR_IMMS_HEADTOKEN, IMMSAnnotatorFactories.headToken(inputProps,
-				(IMMSAnnotatorImplementations) annotatorImplementation));
-		
+				(IMMSAnnotatorImplementations) annotatorImplementation));		
 		superPool.register(Constants.ANNOTATOR_FEAT_IMMS_SRNDWORDS, IMMSAnnotatorFactories.sorroundingWords(inputProps,
 				(IMMSAnnotatorImplementations) annotatorImplementation));
 		superPool.register(Constants.ANNOTATOR_FEAT_IMMS_POS, IMMSAnnotatorFactories.sorroundingPOS(inputProps,
@@ -43,6 +42,7 @@ public class IMMSPipeline extends StanfordCoreNLP {
 				(IMMSAnnotatorImplementations) annotatorImplementation));
 		superPool.register(OpenNlpTokenizeAnnotator.ANNOTATION_NAME, IMMSAnnotatorFactories.openNlpTokenizer(inputProps,
 				(IMMSAnnotatorImplementations) annotatorImplementation));
+		superPool.register(WordNetLemmaAnnotator.ANNOTATION_NAME, IMMSAnnotatorFactories.wordnetLemmatizer(inputProps,(IMMSAnnotatorImplementations)annotatorImplementation));
 		if(Boolean.parseBoolean(inputProps.getProperty("openNLP","false"))){
 			superPool.register(STANFORD_POS, IMMSAnnotatorFactories.openNlpPosTagger(inputProps,
 					(IMMSAnnotatorImplementations) annotatorImplementation));

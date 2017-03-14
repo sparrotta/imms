@@ -20,14 +20,16 @@
 				<configuration>
 					<executable>java</executable>
 					<arguments>
-						<argument>-Xmx7168m</argument>
+						<argument>-Xmx7680m</argument>
 						<argument>-XX:NewRatio=5</argument>
 						<argument>-classpath</argument>
 						<classpath />
 						<argument>it.uniroma1.lcl.imms.IMMS</argument>						
-						<argument>-test</argument>																																											
+						<argument>-test</argument>
 						<argument>in/eng-lex-samp.evaluation</argument>
-						<argument>in/eng-lex-sample.training</argument>
+						<argument>in/eng-lex-sample.training</argument>																																											
+						
+						
 					</arguments>
 				</configuration>
 			</plugin>
@@ -64,6 +66,11 @@
 			<groupId>de.bwaldvogel</groupId>
 			<artifactId>liblinear</artifactId>
 			<version>1.95</version>
+		</dependency>
+		<dependency>
+			<groupId>net.sf.jwordnet</groupId>
+			<artifactId>jwnl</artifactId>
+			<version>1.4_rc3</version>
 		</dependency>
 	</dependencies>
 </project>

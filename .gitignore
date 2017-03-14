@@ -3,6 +3,7 @@
 .project
 .settings/
 convertvec-master/
+dict/
 in/
 out/
 target/
@@ -12,4 +13,5 @@ wordvectors.txt
 wv/
 se2/
 *.bin
-
+clean
+evaluate

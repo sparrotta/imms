@@ -2,12 +2,11 @@ package it.uniroma1.lcl.imms.classifiers;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 
 import edu.stanford.nlp.ling.RVFDatum;
 import edu.stanford.nlp.stats.ClassicCounter;
-import edu.stanford.nlp.stats.Counters;
+import edu.stanford.nlp.stats.Counter;
 import edu.stanford.nlp.util.HashIndex;
 import edu.stanford.nlp.util.Index;
 import edu.stanford.nlp.util.Pair;
@@ -21,7 +20,6 @@ public class IMMSDataset {
 	public Index<String> labelIndex;
 	public Index<String> featureIndex;
 
-	Map<Integer, Index> featureValues;
 	protected int[] labels;
 	protected int[][] data;
 
@@ -34,7 +32,6 @@ public class IMMSDataset {
 	public IMMSDataset(int size) {
 		labelIndex = new HashIndex<>();
 		featureIndex = new HashIndex<>();
-		featureValues = new HashMap<Integer, Index>();
 		labels = new int[size];
 		data = new int[size][];
 		values = new double[size][];
@@ -53,7 +50,7 @@ public class IMMSDataset {
 		labels[size] = labelIndex.addToIndex(label);
 	}
 
-	private void addFeatures(Collection<Feature> features) {
+	private void addFeatures(Counter<String> features) {
 		if (data.length == size) {
 			int[][] newData = new int[size * 2][];
 			double[][] newValues = new double[size * 2][];
@@ -65,45 +62,29 @@ public class IMMSDataset {
 			values = newValues;
 		}
 
-		final int nFeatures = features.size();
-		Feature[] featureArray = features.toArray(new Feature[nFeatures]);
-
+		
+		final List<String> featureNames = new ArrayList<String>();
+		for(String feature : features.keySet()){
+			if(featureIndex.addToIndex(feature)>-1){
+				featureNames.add(feature);
+			}
+		}
+		final int nFeatures = featureNames.size();
 		data[size] = new int[nFeatures];
 		values[size] = new double[nFeatures];
 		for (int i = 0; i < nFeatures; ++i) {
-			Feature feature = featureArray[i];
-			int fID = featureIndex.addToIndex(feature.key());
-			if (fID >= 0) {
-				data[size][i] = fID;
-				values[size][i] = getFeatureValue(feature);
-			} else {
-				// Usually a feature present at test but not training time.
-				assert featureIndex.isLocked() : "Could not add feature to index: " + feature;
-			}
+			String feature = featureNames.get(i);
+			data[size][i] = featureIndex.indexOf(feature);
+			values[size][i] = features.getCount(feature);
 		}
 	}
 
-	double getFeatureValue(Feature feature) {
-		Object featureValue = feature.value();
-		if (featureValue instanceof Number) {
-			return ((Number) featureValue).doubleValue();
-		}
-		int fID = featureIndex.indexOf(feature.key());
-		if (fID > 0) {
-			Index featureValuesIndex = featureValues.get(fID);
-			if (featureValuesIndex == null) {
-				featureValuesIndex = new HashIndex<>();
-				featureValues.put(fID, featureValuesIndex);
-			}
-			return featureValuesIndex.addToIndex(featureValue);
-		}
-		return -1;
-	}
 
+	
 	public RVFDatum<String, String> getRVFDatum(int index) {
 		ClassicCounter<String> c = new ClassicCounter<>();
 		for (int i = 0; i < data[index].length; i++) {
-			c.incrementCount(featureIndex.get(data[index][i]), values[index][i]);
+			c.setCount(featureIndex.get(data[index][i]), values[index][i]);
 		}
 		return new RVFDatum<>(c, labelIndex.get(labels[index]));
 	}
@@ -116,10 +97,15 @@ public class IMMSDataset {
 		return sourcesAndIds.get(index).second();
 	}
 
-	public void add(Collection<Feature> features, String label, String src, String id) {
-		addLabel(label);
-		addFeatures(features);
+	public void add(RVFDatum<String,String> d, String src, String id) {
+		addLabel(d.label());
+		addFeatures(d.asFeaturesCounter());
 		sourcesAndIds.add(new Pair<>(src, id));
 		size++;
+	}
+
+	public int size() {
+		
+		return size;
 	}
 }

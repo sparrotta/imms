@@ -133,6 +133,25 @@ public class IMMSAnnotatorFactories {
 			}
 		};
 	}
+	
+	public static AnnotatorFactory wordnetLemmatizer(Properties inputProps,
+			IMMSAnnotatorImplementations annotatorImplementation) {
+
+		return new AnnotatorFactory(inputProps, annotatorImplementation) {
+
+			private static final long serialVersionUID = 1L;
+
+			@Override
+			public Annotator create() {
+				return annotatorImplementation.wordnetLemmatizer(inputProps);
+			}
+
+			@Override
+			protected String additionalSignature() {
+				return "";
+			}
+		};
+	}
 
 	public static AnnotatorFactory headToken(Properties inputProps,
 			IMMSAnnotatorImplementations annotatorImplementation) {

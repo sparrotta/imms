@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
+import java.util.Set;
 
 import de.bwaldvogel.liblinear.Feature;
 import de.bwaldvogel.liblinear.FeatureNode;
@@ -26,12 +27,16 @@ import it.uniroma1.lcl.imms.Constants.LexicalItemAnnotation;
 public class LibLinearClassifier extends Classifier<Model> {
 	
 	static final String DEFAULT_BIAS = "-1.0";
-	Parameter parameter = new Parameter(SolverType.L2R_L2LOSS_SVC_DUAL, 1, Double.POSITIVE_INFINITY);
+	static final String DEFAULT_SOLVER = SolverType.L2R_L2LOSS_SVC_DUAL.name();
+	Parameter parameter;
 	private double bias;
 	
 	public LibLinearClassifier(Properties properties) {
 		super(properties);
 		bias = Double.parseDouble(getProperties().getProperty(Constants.PROPERTY_IMMS_LIBLINEAR_BIAS, DEFAULT_BIAS));
+		SolverType solver = SolverType.valueOf(getProperties().getProperty(Constants.PROPERTY_IMMS_LIBLINEAR_SOLVER, DEFAULT_SOLVER));
+		String eps = getProperties().getProperty(Constants.PROPERTY_IMMS_LIBLINEAR_EPS);
+		parameter = new Parameter(solver, 1, eps!=null ? Double.parseDouble(eps) : Double.POSITIVE_INFINITY);
 	}
 
 	@Override
@@ -53,38 +58,41 @@ public class LibLinearClassifier extends Classifier<Model> {
 		RVFDataset<String,String> d = dataset(lexElement);
 		prob.bias = bias;	
 		prob.l = d.size();
-		prob.n = d.numFeatures() + (prob.bias >= 0 ? 1 : 0);
+		prob.n = d.featureIndex.size() + (prob.bias >= 0 ? 1 : 0);
 		prob.x = new Feature[prob.l][];
 		prob.y = new double[prob.l];
-
+		int[] labels = d.getLabelsArray();
 		for (int i = 0; i < prob.l; i++) {
 			RVFDatum<String, String> datum = d.getRVFDatum(i);
-			Collection<Feature> featureNodes = asFeatureNodes(datum.asFeaturesCounter(), d.featureIndex);			
+			Collection<Feature> featureNodes = asFeatureNodes(datum.asFeaturesCounter(), d.featureIndex,bias);			
 			prob.x[i] = featureNodes.toArray(new Feature[featureNodes.size()]);
-			prob.y[i] = d.labelIndex().indexOf(datum.label());
+			prob.y[i] = labels[i];
 		}
 		
 		return prob;
 	}	
 	
-	Collection<Feature> asFeatureNodes(Counter<String> featuresCounter,Index featureIndex){
-		List<Feature> featureNodes = new ArrayList<Feature>();
-		for (Entry<String,Double> feature : featuresCounter.entrySet()) {
-			int featIndex = featureIndex.indexOf(feature.getKey());
-			if(featIndex>-1){
-				featureNodes.add(new FeatureNode(featIndex + 1, feature.getValue()));
-			}				
-		}
-		featureNodes.sort(new Comparator<Feature>() {
+	Collection<Feature> asFeatureNodes(Counter<String> featuresCounter,Index featureIndex,double bias){
+		List<String> featureNames = new ArrayList<String>(featuresCounter.keySet());
+		featureNames.sort(new Comparator<String>(){
 			@Override
-			public int compare(Feature o1, Feature o2) {
-				if (o1.getIndex() == o2.getIndex()) {
+			public int compare(String o1, String o2) {
+				int i1 = featureIndex.indexOf(o1);
+				int i2 = featureIndex.indexOf(o2);
+				if(i1==i2){ 
 					return 0;
 				} else {
-					return o1.getIndex() < o2.getIndex() ? -1 : 1;
-				}
-			}
+					return i1<i2 ? -1 : 1;
+				}				
+			}			
 		});
+		List<Feature> featureNodes = new ArrayList<Feature>();
+		for(String feature : featureNames){
+			int fID = featureIndex.indexOf(feature);				
+			if(fID>-1){
+				featureNodes.add(new FeatureNode(fID+1, featuresCounter.getCount(feature)));
+			}
+		}		
 		if (bias >= 0) {
 			featureNodes.add(new FeatureNode(featureIndex.size(), bias));
 		}
@@ -96,15 +104,18 @@ public class LibLinearClassifier extends Classifier<Model> {
 	@Override
 	public List<String> test(String lexElem) {
 		RVFDataset<String,String> d = dataset(lexElem);
-		
+		int[] labels = d.getLabelsArray();
 		List<String> answers = new ArrayList<String>();
 				
 		for (int i = 0; i < d.size(); i++) {			
-			Collection<Feature> featureNodes = asFeatureNodes(d.getRVFDatum(i).asFeaturesCounter(), d.featureIndex);			
-			Feature[] instance =  featureNodes.toArray(new Feature[featureNodes.size()]);														
-			double answer = Linear.predict(model(lexElem), instance);			
+						
+			Model model = model(lexElem);			
+			Collection<Feature> featureNodes = asFeatureNodes(d.getRVFDatum(i).asFeaturesCounter(), d.featureIndex, model.getBias());
+			Feature[] instance =  featureNodes.toArray(new Feature[featureNodes.size()]);
 			
-			d.getLabelsArray()[i]=(new Double(answer).intValue());			
+			double answer = Linear.predict(model, instance);			
+			
+			labels[i]=(new Double(answer).intValue());			
 			answers.add(d.labelIndex.get(new Double(answer).intValue()));			
 		}
 		return answers;

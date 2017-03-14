@@ -16,6 +16,12 @@ public interface Constants {
 
 	public static String fileSeparator = System.getProperty("file.separator");
 
+
+
+	
+
+	
+
 	public static final Predicate<String> PREDICATE_IS_WORD = Pattern.compile("[a-zA-Z][_a-zA-Z0-9]*").asPredicate();
 
 	public static final String UNKNOWN_SENSE = "UNKNOWN";
@@ -45,15 +51,25 @@ public interface Constants {
 	
 	public static final String PROPERTY_OPEN_NLP = "openNLP";
 
+	
+	
 	public static final String PROPERTY_IMMS_SRNDWORDS_WINDOWSIZE = ANNOTATOR_FEAT_IMMS_SRNDWORDS+".windowsize";
 	public static final String PROPERTY_IMMS_SRNDWORDS_ADDSTOPWRD = ANNOTATOR_FEAT_IMMS_SRNDWORDS+".addStopWords";
+	
 	public static final String PROPERTY_IMMS_POS_WINDOWSIZE = ANNOTATOR_FEAT_IMMS_POS+".windowsize";
+	
 	public static final String PROPERTY_IMMS_LCOLLOCATIONSET = ANNOTATOR_FEAT_IMMS_LCOLLOCATION+".set";
+	
 	public static final String PROPERTY_IMMS_WORDEMBED_WINDOWSIZE = ANNOTATOR_FEAT_IMMS_WORDEMBED + ".windowsize";
 	public static final String PROPERTY_IMMS_WORDEMBED_FILE = ANNOTATOR_FEAT_IMMS_WORDEMBED + ".file";
 	public static final String PROPERTY_IMMS_WORDEMBED_STRATEGY = ANNOTATOR_FEAT_IMMS_WORDEMBED + ".strategy";
+	public static final String PROPERTY_IMMS_WORDEMBED_SENTENCEBOUND = ANNOTATOR_FEAT_IMMS_WORDEMBED + ".sentencebound";
+	public static final String PROPERTY_IMMS_WORDEMBED_SIGMA = ANNOTATOR_FEAT_IMMS_WORDEMBED + ".sigma";
+	
 	public static final String PROPERTY_IMMS_LIBLINEAR_BIAS = CLASSIFIER_IMMS_LIBLINEAR + ".bias";
-
+	public static final String PROPERTY_IMMS_LIBLINEAR_SOLVER = CLASSIFIER_IMMS_LIBLINEAR + ".solver";
+	public static final String PROPERTY_IMMS_LIBLINEAR_EPS = CLASSIFIER_IMMS_LIBLINEAR + ".eps";
+	
 	public static class FeaturesAnnotation implements CoreAnnotation<List<Feature>> {
 		public Class<List<Feature>> getType() {
 			return ErasureUtils.<Class<List<Feature>>> uncheckedCast(List.class);
