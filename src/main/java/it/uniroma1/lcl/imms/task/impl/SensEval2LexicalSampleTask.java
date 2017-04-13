@@ -13,6 +13,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Stack;
 
 import javax.xml.stream.XMLInputFactory;
@@ -28,26 +29,59 @@ import it.uniroma1.lcl.imms.Constants;
 import it.uniroma1.lcl.imms.Constants.DocSourceAnnotation;
 import it.uniroma1.lcl.imms.Constants.LexicalItemAnnotation;
 import it.uniroma1.lcl.imms.annotator.feature.Feature;
-import it.uniroma1.lcl.imms.classifiers.IMMSDataset;
 import it.uniroma1.lcl.imms.task.ITaskHandler;
+import net.didion.jwnl.JWNL;
+import net.didion.jwnl.JWNLException;
+import net.didion.jwnl.data.IndexWord;
+import net.didion.jwnl.dictionary.Dictionary;
 
 public class SensEval2LexicalSampleTask implements ITaskHandler {
 
 	XMLStreamReader xmlReader;
 	private Map<String, String> answers = new HashMap<String,String>();
-		
+	Dictionary dictionary;
+	String resultDir;
+	public SensEval2LexicalSampleTask(Properties properties) {
+		resultDir = properties.getProperty(Constants.PROPERTY_TASK_RESULT_DIR);
+		if(!JWNL.isInitialized()){
+			try {
+				JWNL.initialize(new FileInputStream(properties.getProperty(Constants.PROPERTY_JWNL_PROP_FILE)));
+			} catch (FileNotFoundException|JWNLException e) {
+				e.printStackTrace();
+			}		
+		}
+		dictionary = Dictionary.getInstance();
+	}
+	
 	@Override
 	public Iterator<Annotation> iterator() {
 		return new SensEval2LexicalSampleCorpusIterator(xmlReader);
 	}
 	
-	public void writeResults(String resultDir,String lexElem, RVFDataset<String,String> dataset){
+	public void writeResults(String lexElem, RVFDataset<String,String> dataset){
 		String resultFilename = resultDir+Constants.fileSeparator+lexElem+".result";
 		OutputStreamWriter os =null;
 		try{
-			os = new OutputStreamWriter(new FileOutputStream(resultFilename));					
-			for(int i=0; i<dataset.size();i++){				
-				os.append(/*dataset.getRVFDatumSource(i)*/ lexElem.split("\\.")[0]+" "+dataset.getRVFDatumId(i)+" "+dataset.getRVFDatum(i).label()+"\n");
+			os = new OutputStreamWriter(new FileOutputStream(resultFilename));
+			String[] lemmaPosArr = lexElem.split("\\.");
+			IndexWord word=null;			
+			try {
+				word = dictionary.lookupIndexWord(Constants.posTagMap.get(lemmaPosArr[1]), lemmaPosArr[0]);
+			} catch (JWNLException e) {}
+						
+			for(int i=0; i<dataset.size();i++){
+				String answer = dataset.getRVFDatum(i).label();
+				if(answer==null && word!=null){
+					try {
+						answer = word.getSense(1).getSenseKey(lemmaPosArr[0]);
+					} catch (JWNLException e) {
+						
+					}
+				}
+				if(answer==null){
+					answer="U";
+				}
+				os.append(lemmaPosArr[0]+" "+dataset.getRVFDatumId(i)+" "+answer+"\n");
 			}		
 		} catch(IOException e){
 			throw new RuntimeException(e);
@@ -63,31 +97,7 @@ public class SensEval2LexicalSampleTask implements ITaskHandler {
 		}
 	}
 	
-	public Map<String,Double> evaluate(Map<String,RVFDataset<String,String>> datasets){		
-		double positive = 0.0;
-		double total = answers.size();		
-		double answered = 0.0;		
-		
-		for(RVFDataset<String, String> dataset: datasets.values()){									
-			for(int i=0; i<dataset.size(); i++){
-				++answered;
-				String id = dataset.getRVFDatumId(i);
-				String label = dataset.getDatum(i).label();
-				String answer = answers.get(id);
-				
-				positive += label.equals(answer) ? 1:0;
-			}						
-		}
-					
-		Map<String,Double>map = new HashMap<String,Double>();
-		map.put("total",total);
-		map.put("true_positive", positive);
-		map.put("precision", positive/answered);
-		map.put("recall", positive/total);
-		map.put("attempted", answered);
-		
-		return map;
-	}
+	
 
 	
 	class SensEval2LexicalSampleCorpusIterator implements Iterator<Annotation> {

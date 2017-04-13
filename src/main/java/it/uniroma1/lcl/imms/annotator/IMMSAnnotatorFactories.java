@@ -26,12 +26,12 @@ public class IMMSAnnotatorFactories {
 			@Override
 			protected String additionalSignature() {				
 				StringBuilder sb = new StringBuilder();
-				sb.append(Constants.PROPERTY_IMMS_SRNDWORDS_WINDOWSIZE+"=")
-				.append(inputProps.getProperty(Constants.PROPERTY_IMMS_SRNDWORDS_WINDOWSIZE, SorroundingWordsFeatureAnnotator.DEFAULT_WINDOWSIZE));
+				sb.append(SorroundingWordsFeatureAnnotator.PROPERTY_WINDOWSIZE+"=")
+				.append(inputProps.getProperty(SorroundingWordsFeatureAnnotator.PROPERTY_WINDOWSIZE, SorroundingWordsFeatureAnnotator.DEFAULT_WINDOWSIZE));
 				
-				if(inputProps.containsKey(Constants.PROPERTY_IMMS_SRNDWORDS_ADDSTOPWRD)){
-					sb.append(Constants.PROPERTY_IMMS_SRNDWORDS_ADDSTOPWRD+"=")
-					.append(inputProps.getProperty(Constants.PROPERTY_IMMS_SRNDWORDS_ADDSTOPWRD));
+				if(inputProps.containsKey(SorroundingWordsFeatureAnnotator.PROPERTY_ADDSTOPWRD)){
+					sb.append(SorroundingWordsFeatureAnnotator.PROPERTY_ADDSTOPWRD+"=")
+					.append(inputProps.getProperty(SorroundingWordsFeatureAnnotator.PROPERTY_ADDSTOPWRD));
 				}
 				
 				return sb.toString();
@@ -53,7 +53,7 @@ public class IMMSAnnotatorFactories {
 
 			@Override
 			protected String additionalSignature() {
-				return Constants.PROPERTY_IMMS_POS_WINDOWSIZE+"="+inputProps.getProperty(Constants.PROPERTY_IMMS_POS_WINDOWSIZE, POSFeatureAnnotator.DEFAULT_WINDOWSIZE);
+				return POSFeatureAnnotator.PROPERTY_WINDOWSIZE+"="+inputProps.getProperty(POSFeatureAnnotator.PROPERTY_WINDOWSIZE, POSFeatureAnnotator.DEFAULT_WINDOWSIZE);
 			}
 		};
 	}
@@ -72,7 +72,7 @@ public class IMMSAnnotatorFactories {
 
 			@Override
 			protected String additionalSignature() {
-				return Constants.PROPERTY_IMMS_LCOLLOCATIONSET+"="+inputProps.getProperty(Constants.PROPERTY_IMMS_LCOLLOCATIONSET, LocalCollocationFeatureAnnotator.DEFAULT_COLLOCATIONS);
+				return LocalCollocationFeatureAnnotator.PROPERTY_LCOLLOCATIONSET+"="+inputProps.getProperty(LocalCollocationFeatureAnnotator.PROPERTY_LCOLLOCATIONSET, LocalCollocationFeatureAnnotator.DEFAULT_COLLOCATIONS);
 			}
 		};
 	}
@@ -91,7 +91,7 @@ public class IMMSAnnotatorFactories {
 
 			@Override
 			protected String additionalSignature() {
-				return Constants.PROPERTY_IMMS_WORDEMBED_WINDOWSIZE+"="+inputProps.getProperty(Constants.PROPERTY_IMMS_WORDEMBED_WINDOWSIZE, WordEmbeddingFeatureAnnotator.DEFAULT_WINDOWSIZE);
+				return WordEmbeddingFeatureAnnotator.PROPERTY_WINDOWSIZE+"="+inputProps.getProperty(WordEmbeddingFeatureAnnotator.PROPERTY_WINDOWSIZE, WordEmbeddingFeatureAnnotator.DEFAULT_WINDOWSIZE);
 			}
 		};
 	}
@@ -163,6 +163,24 @@ public class IMMSAnnotatorFactories {
 			@Override
 			public Annotator create() {
 				return annotatorImplementation.headToken(inputProps);
+			}
+
+			@Override
+			protected String additionalSignature() {
+				return "";
+			}
+		};
+	}
+
+	public static AnnotatorFactory openNlpLemmatizer(Properties inputProps,
+			IMMSAnnotatorImplementations annotatorImplementation) {
+		return new AnnotatorFactory(inputProps, annotatorImplementation) {
+
+			private static final long serialVersionUID = 1L;
+
+			@Override
+			public Annotator create() {
+				return annotatorImplementation.openNlpLemma(inputProps);
 			}
 
 			@Override

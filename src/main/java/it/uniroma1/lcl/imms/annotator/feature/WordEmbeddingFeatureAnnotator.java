@@ -22,20 +22,33 @@ import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.pipeline.Annotator;
+import edu.stanford.nlp.pipeline.Annotator.Requirement;
 import edu.stanford.nlp.util.ArraySet;
 import edu.stanford.nlp.util.CoreMap;
 import it.uniroma1.lcl.imms.Constants;
 import it.uniroma1.lcl.imms.Constants.HeadTokenAnnotation;
 import it.uniroma1.lcl.imms.Constants.HeadsAnnotation;
+import it.uniroma1.lcl.imms.annotator.HeadTokenAnnotator;
 
 public class WordEmbeddingFeatureAnnotator implements Annotator {
 
+	
 	public enum Strategies {
 		concatenation,
 		fractional,
 		average,
 		exponential
 	}
+	
+	public static final String ANNOTATION_NAME = "feat_wordembed";
+	public static final String FEATURE_PREFIX = "WRDMB_";
+	public static final Requirement REQUIREMENT = new Requirement(ANNOTATION_NAME);
+
+	public static final String PROPERTY_WINDOWSIZE = ANNOTATION_NAME+ ".windowsize";
+	public static final String PROPERTY_FILE = ANNOTATION_NAME + ".file";
+	public static final String PROPERTY_STRATEGY = ANNOTATION_NAME + ".strategy";
+	public static final String PROPERTY_SENTENCEBOUND = ANNOTATION_NAME + ".sentencebound";
+	public static final String PROPERTY_SIGMA = ANNOTATION_NAME + ".sigma";
 	
 	public static final String DEFAULT_WINDOWSIZE = "10";
 	public static final String DEFAULT_STRATEGY = "concatenation";
@@ -52,15 +65,15 @@ public class WordEmbeddingFeatureAnnotator implements Annotator {
 	private boolean sentenceBound;
 
 	public WordEmbeddingFeatureAnnotator(Properties properties) {
-		windowSize = Integer.valueOf(properties.getProperty(Constants.PROPERTY_IMMS_WORDEMBED_WINDOWSIZE,DEFAULT_WINDOWSIZE));
+		windowSize = Integer.valueOf(properties.getProperty(PROPERTY_WINDOWSIZE,DEFAULT_WINDOWSIZE));
 		decay = 1 - Math.pow(0.1,(windowSize-1)*-1);
-		strategy = Strategies.valueOf(Strategies.class,properties.getProperty(Constants.PROPERTY_IMMS_WORDEMBED_STRATEGY,DEFAULT_STRATEGY));
-		sigma = Double.valueOf(properties.getProperty(Constants.PROPERTY_IMMS_WORDEMBED_SIGMA,DEFAULT_SIGMA));
-		sentenceBound = Boolean.valueOf(properties.getProperty(Constants.PROPERTY_IMMS_WORDEMBED_SENTENCEBOUND,DEFAULT_SENTENCEBOUND));
+		strategy = Strategies.valueOf(Strategies.class,properties.getProperty(PROPERTY_STRATEGY,DEFAULT_STRATEGY));
+		sigma = Double.valueOf(properties.getProperty(PROPERTY_SIGMA,DEFAULT_SIGMA));
+		sentenceBound = Boolean.valueOf(properties.getProperty(PROPERTY_SENTENCEBOUND,DEFAULT_SENTENCEBOUND));
 		BufferedReader reader = null;
 		try {
 
-			String filename = properties.getProperty(Constants.PROPERTY_IMMS_WORDEMBED_FILE);
+			String filename = properties.getProperty(PROPERTY_FILE);
 			System.out.print("Reading word embeddings from "+filename+" ...");
 			reader = new BufferedReader(new InputStreamReader(new FileInputStream(filename)));
 			
@@ -79,8 +92,7 @@ public class WordEmbeddingFeatureAnnotator implements Annotator {
 					for (int i = 0; i < vector.length; i++) {
 						vector[i] = Double.parseDouble(array[i + 1]);						
 					}
-//					wordMap.put(array[0].trim().toLowerCase(), vector);
-					wordMap.put(array[0], vector);
+					wordMap.put(array[0].trim().toLowerCase(), vector);					
 				} catch (Exception e) {
 					// corrupted line
 					System.err.println("Corrupted line: " + line);
@@ -184,7 +196,7 @@ public class WordEmbeddingFeatureAnnotator implements Annotator {
 			}
 		}
 		for(int i=0; i < vectorSize; i++){
-			features.add(new Feature<Double>("WE_"+i,v[i]/windowSize));
+			features.add(new Feature<Double>(FEATURE_PREFIX+i,v[i]/windowSize));
 		}
 		
 		return features;
@@ -208,7 +220,7 @@ public class WordEmbeddingFeatureAnnotator implements Annotator {
 			}
 		}
 		for(int i=0; i < vectorSize; i++){
-			features.add(new Feature<Double>("WE_"+i,v[i]));
+			features.add(new Feature<Double>(FEATURE_PREFIX+i,v[i]));
 		}
 		return features;
 
@@ -232,7 +244,7 @@ public class WordEmbeddingFeatureAnnotator implements Annotator {
 			}
 		}
 		for(int i=0; i < vectorSize; i++){
-			features.add(new Feature<Double>("WE_"+i,v[i]/(2*windowSize)));
+			features.add(new Feature<Double>(FEATURE_PREFIX+i,v[i]/(2*windowSize)));
 		}
 		return features;
 
@@ -254,7 +266,7 @@ public class WordEmbeddingFeatureAnnotator implements Annotator {
 							value = wordMap.get(word)[j];
 						}								
 					}						
-					features.add(new Feature<Double>("WE_"+pos,value));
+					features.add(new Feature<Double>(FEATURE_PREFIX+pos,value));
 				}
 			}
 
@@ -266,12 +278,12 @@ public class WordEmbeddingFeatureAnnotator implements Annotator {
 
 	@Override
 	public Set<Requirement> requirementsSatisfied() {
-		return Collections.singleton(Constants.REQUIREMENT_ANNOTATOR_FEAT_IMMS_WORDEMBED);
+		return Collections.singleton(REQUIREMENT);
 	}
 
 	@Override
 	public Set<Requirement> requires() {
-		return Collections.unmodifiableSet(new ArraySet<>(TOKENIZE_REQUIREMENT, SSPLIT_REQUIREMENT,LEMMA_REQUIREMENT,Constants.REQUIREMENT_ANNOTATOR_IMMS_HEADTOKEN));
+		return Collections.unmodifiableSet(new ArraySet<>(TOKENIZE_REQUIREMENT, SSPLIT_REQUIREMENT,LEMMA_REQUIREMENT,HeadTokenAnnotator.REQUIREMENT));
 	}
 
 }

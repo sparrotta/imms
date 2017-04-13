@@ -43,4 +43,8 @@ public class IMMSAnnotatorImplementations extends AnnotatorImplementations {
 	public Annotator headToken(Properties properties) {		
 		return new HeadTokenAnnotator(properties);
 	}
+
+	public Annotator openNlpLemma(Properties properties) {
+		return new OpenNlpLemmaAnnotator(properties);
+	}
 }

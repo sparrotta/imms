@@ -26,12 +26,11 @@ public class OpenNlpPosTaggerAnnotator implements Annotator {
 	public static final String ANNOTATION_NAME = "opos";
 	public static final Requirement OPOS_REQUIREMENT = new Requirement(ANNOTATION_NAME);		
 	public static final String PROPERTY_MODEL = ANNOTATION_NAME+".model";
-	public static final String PROPERTY_DICTIONARY = ANNOTATION_NAME+".dictionary";
+
 	private POSTaggerME tagger;
 	
 	public OpenNlpPosTaggerAnnotator(Properties props) {
 		String modelPath = props.getProperty(PROPERTY_MODEL);
-		String dictPath = props.getProperty(PROPERTY_DICTIONARY);
 		if (modelPath != null) {
 			try {
 				this.tagger = new POSTaggerME(new POSModel(new File(modelPath)));

@@ -16,20 +16,32 @@ import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
 import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.pipeline.Annotator;
+import edu.stanford.nlp.pipeline.Annotator.Requirement;
 import edu.stanford.nlp.util.ArraySet;
 import edu.stanford.nlp.util.CoreMap;
 import it.uniroma1.lcl.imms.Constants;
 import it.uniroma1.lcl.imms.Constants.HeadTokenAnnotation;
 import it.uniroma1.lcl.imms.Constants.HeadsAnnotation;
+import it.uniroma1.lcl.imms.annotator.HeadTokenAnnotator;
 
 public class POSFeatureAnnotator implements Annotator {
 
+	public static final String ANNOTATION_NAME = "feat_pos";
+	public static final String FEATURE_PREFIX = "POS_";
+	public static final Requirement REQUIREMENT = new Requirement(ANNOTATION_NAME);
+
+	public static final String PROPERTY_WINDOWSIZE = ANNOTATION_NAME+ ".windowsize";
+	public static final String PROPERTY_PUNCTUATION = ANNOTATION_NAME+ ".punctuation";
+
 	public static final String DEFAULT_WINDOWSIZE = "3";
+	public static final String DEFAULT_PUNCTUATION = "false";
 	
 	Integer windowSize;
+	boolean punctuation;
 	
 	public POSFeatureAnnotator(Properties properties) {
-		windowSize = Integer.valueOf(properties.getProperty(Constants.PROPERTY_IMMS_POS_WINDOWSIZE,DEFAULT_WINDOWSIZE));
+		windowSize = Integer.valueOf(properties.getProperty(PROPERTY_WINDOWSIZE,DEFAULT_WINDOWSIZE));
+		punctuation = Boolean.valueOf(properties.getProperty(PROPERTY_PUNCTUATION,DEFAULT_PUNCTUATION));
 	}
 
 	@Override
@@ -54,19 +66,19 @@ public class POSFeatureAnnotator implements Annotator {
 		}
 		if(tokens!=null){
 			Integer headIndex=head.index()-tokens.get(0).index();
-			features.add(new Feature<Boolean>("P0_"+head.tag(),true));
+			features.add(new Feature<Boolean>(FEATURE_PREFIX+"0_"+head.tag(),true));
 			int position = 0;
 			for(int i=headIndex-1; i >= 0 && position < windowSize; i--){
 				CoreLabel token = tokens.get(i);
-				if(Constants.PREDICATE_IS_WORD.test(token.lemma())){
-					features.add(new Feature<Boolean>("P-" + (++position) + "_" + token.tag(), true));
+				if(punctuation || Constants.PREDICATE_IS_WORD.test(token.lemma())){
+					features.add(new Feature<Boolean>(FEATURE_PREFIX+"-" + (++position) + "_" + token.tag(), true));
 				}					
 			}
 			position = 0;
 			for(int i=headIndex+1; i < tokens.size() && position < windowSize; i++){
 				CoreLabel token = tokens.get(i);
-				if(Constants.PREDICATE_IS_WORD.test(token.lemma())){
-					features.add(new Feature<Boolean>("P" + (++position) + "_" + token.tag(), true));
+				if(punctuation || Constants.PREDICATE_IS_WORD.test(token.lemma())){
+					features.add(new Feature<Boolean>(FEATURE_PREFIX+ (++position) + "_" + token.tag(), true));
 				}					
 			}
 		}
@@ -77,12 +89,12 @@ public class POSFeatureAnnotator implements Annotator {
 	
 	@Override
 	public Set<Requirement> requirementsSatisfied() {
-		return Collections.singleton(Constants.REQUIREMENT_ANNOTATOR_FEAT_IMMS_POS);
+		return Collections.singleton(REQUIREMENT);
 	}
 
 	@Override
 	public Set<Requirement> requires() {
-		return Collections.unmodifiableSet(new ArraySet<>(TOKENIZE_REQUIREMENT, SSPLIT_REQUIREMENT,POS_REQUIREMENT,Constants.REQUIREMENT_ANNOTATOR_IMMS_HEADTOKEN));
+		return Collections.unmodifiableSet(new ArraySet<>(TOKENIZE_REQUIREMENT, SSPLIT_REQUIREMENT,POS_REQUIREMENT,HeadTokenAnnotator.REQUIREMENT));
 	}
 
 }

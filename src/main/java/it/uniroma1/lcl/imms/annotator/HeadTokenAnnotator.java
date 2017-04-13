@@ -15,6 +15,7 @@ import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
 import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.pipeline.Annotator;
+import edu.stanford.nlp.pipeline.Annotator.Requirement;
 import edu.stanford.nlp.util.CoreMap;
 import it.uniroma1.lcl.imms.Constants;
 import it.uniroma1.lcl.imms.Constants.HeadTokenAnnotation;
@@ -22,7 +23,9 @@ import it.uniroma1.lcl.imms.Constants.HeadsAnnotation;
 
 public class HeadTokenAnnotator implements Annotator {
 
-		
+	public static final String ANNOTATION_NAME = "head";
+	public static final Requirement REQUIREMENT = new Requirement(ANNOTATION_NAME);
+	
 
 
 	public HeadTokenAnnotator(Properties properties) {
@@ -73,7 +76,7 @@ public class HeadTokenAnnotator implements Annotator {
 
 	@Override
 	public Set<Requirement> requirementsSatisfied() {
-		return Collections.singleton(Constants.REQUIREMENT_ANNOTATOR_IMMS_HEADTOKEN);
+		return Collections.singleton(REQUIREMENT);
 	}
 
 }

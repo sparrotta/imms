@@ -27,9 +27,12 @@
 						<argument>it.uniroma1.lcl.imms.IMMS</argument>						
 						<argument>-test</argument>
 						<argument>in/eng-lex-samp.evaluation</argument>
-						<argument>in/eng-lex-sample.training</argument>																																											
+						<argument>in/eng-lex-sample.training</argument>
 						
 						
+						
+						
+																																																	
 					</arguments>
 				</configuration>
 			</plugin>
@@ -58,11 +61,6 @@
 			<version>2.6.1</version>
 		</dependency>
 		<dependency>
-			<groupId>org.apache.opennlp</groupId>
-			<artifactId>opennlp-tools</artifactId>
-			<version>1.6.0</version>
-		</dependency>
-		<dependency>
 			<groupId>de.bwaldvogel</groupId>
 			<artifactId>liblinear</artifactId>
 			<version>1.95</version>
@@ -71,6 +69,11 @@
 			<groupId>net.sf.jwordnet</groupId>
 			<artifactId>jwnl</artifactId>
 			<version>1.4_rc3</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.opennlp</groupId>
+			<artifactId>opennlp-tools</artifactId>
+			<version>1.7.2</version>
 		</dependency>
 	</dependencies>
 </project>

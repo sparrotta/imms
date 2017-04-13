@@ -50,13 +50,13 @@ public class IMMSTester {
 		while (it.hasNext()) {
 			Annotation text = it.next();
 			pipeline.annotate(text);
-			classifier.add(text);
+			classifier.addTestSample(text);
 		}
 		
 		
 		classifier.test();		
-		for(Entry<String, RVFDataset<String,String>>entry : ((Map<String, RVFDataset<String,String>>)classifier.allDatasets()).entrySet()){						
-			taskHandler.writeResults(properties.getProperty(Constants.PROPERTY_TASK_RESULT_DIR),entry.getKey(),entry.getValue());
+		for(Entry<String, RVFDataset<String,String>>entry : ((Map<String, RVFDataset<String,String>>)classifier.getTestData()).entrySet()){						
+			taskHandler.writeResults(entry.getKey(),entry.getValue());
 		}
 		
 	}
@@ -67,7 +67,7 @@ public class IMMSTester {
 		String keyFilename = testFilename+".key";
 		
 		//Just as a reminder of original ims command line
-		//TODO porting from command line into properties
+		//TODO porting from command line into properties. some properties have no use anymore
 		String generalOptions = "Usage: testPath modelDir statisticDir saveDir\n"
 				+ "\t-i class name of Instance Extractor(default sg.edu.nus.comp.nlp.ims.instance.CInstanceExtractor)\n"
 				+ "\t-f class name of Feature Extractor(default sg.edu.nus.comp.nlp.ims.feature.CFeatureExtractorCombination)\n"

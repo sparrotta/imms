@@ -41,24 +41,24 @@ public class IMMSTrainer {
 	}
 
 	void doTrain(String trainFile) throws FileNotFoundException, IOException {
-		ITaskHandler cr = this.pipeline.getTaskHandler();
-		cr.loadCorpus(trainFile);		
-		doTrain(cr);				
+		ITaskHandler th = this.pipeline.getTaskHandler();
+		th.loadCorpus(trainFile);		
+		doTrain(th);				
 	}
 	void doTrain(String trainFile, String keyFile) throws FileNotFoundException, IOException {
-		ITaskHandler cr = this.pipeline.getTaskHandler();
-		cr.loadCorpus(trainFile);
-		cr.loadAnswers(keyFile);
-		doTrain(cr);				
+		ITaskHandler th = this.pipeline.getTaskHandler();
+		th.loadCorpus(trainFile);
+		th.loadAnswers(keyFile);
+		doTrain(th);				
 	}
-	void doTrain(ITaskHandler corpusReader) {				
-		Iterator<Annotation> it = corpusReader.iterator();
+	void doTrain(ITaskHandler taskHandler) {				
+		Iterator<Annotation> it = taskHandler.iterator();
 		Classifier classifier = pipeline.getClassifier();
 		 int cnt=0;
 		while (it.hasNext()) {
 			Annotation text = it.next();
 			pipeline.annotate(text);						
-			classifier.add(text);			
+			classifier.addTrainingSample(text);			
 		}		
 		classifier.train();
 	

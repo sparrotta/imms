@@ -14,19 +14,28 @@ import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
 import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.pipeline.Annotator;
+import edu.stanford.nlp.pipeline.Annotator.Requirement;
 import edu.stanford.nlp.util.ArraySet;
 import edu.stanford.nlp.util.CoreMap;
 import it.uniroma1.lcl.imms.Constants;
 import it.uniroma1.lcl.imms.Constants.HeadTokenAnnotation;
 import it.uniroma1.lcl.imms.Constants.HeadsAnnotation;
+import it.uniroma1.lcl.imms.annotator.HeadTokenAnnotator;
 
 public class LocalCollocationFeatureAnnotator implements Annotator {
 
+	public static final String ANNOTATION_NAME = "feat_lcollocation";
+	public static final String FEATURE_PREFIX = "LOC_";
+	public static final Requirement REQUIREMENT = new Requirement(ANNOTATION_NAME);
+
+	
+	public static final String PROPERTY_LCOLLOCATIONSET = ANNOTATION_NAME+".set";
+	
 	public static final String DEFAULT_COLLOCATIONS = "-2:-2,-1:-1,1:1,2:2,-2:-1,-1:1,1:2,-3:-1,-2:1,-1:2,1:3";
 	String collocations;
 	
 	public LocalCollocationFeatureAnnotator(Properties properties) {
-		collocations = properties.getProperty(Constants.PROPERTY_IMMS_LCOLLOCATIONSET, DEFAULT_COLLOCATIONS);
+		collocations = properties.getProperty(PROPERTY_LCOLLOCATIONSET, DEFAULT_COLLOCATIONS);
 	}
 
 	@Override
@@ -53,7 +62,7 @@ public class LocalCollocationFeatureAnnotator implements Annotator {
 				String [] pair = collIndexPair.split(":");
 				int start = Integer.parseInt(pair[0]);
 				int end = Integer.parseInt(pair[1]);
-				String key = "LC"+start+":"+end;
+				String key = FEATURE_PREFIX+start+":"+end;
 				for(int i=headIndex+start;i<=headIndex+end;i++){
 					if(i==headIndex){
 						continue;
@@ -71,12 +80,12 @@ public class LocalCollocationFeatureAnnotator implements Annotator {
 
 	@Override
 	public Set<Requirement> requirementsSatisfied() {
-		return Collections.singleton(Constants.REQUIREMENT_ANNOTATOR_FEAT_IMMS_LCOLLOCATION);
+		return Collections.singleton(REQUIREMENT);
 	}
 
 	@Override
 	public Set<Requirement> requires() {
-		return Collections.unmodifiableSet(new ArraySet<>(TOKENIZE_REQUIREMENT, SSPLIT_REQUIREMENT,LEMMA_REQUIREMENT,Constants.REQUIREMENT_ANNOTATOR_IMMS_HEADTOKEN));
+		return Collections.unmodifiableSet(new ArraySet<>(TOKENIZE_REQUIREMENT, SSPLIT_REQUIREMENT,LEMMA_REQUIREMENT,HeadTokenAnnotator.REQUIREMENT));
 	}
 
 }

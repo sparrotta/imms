@@ -16,7 +16,6 @@ public interface ITaskHandler {
 	
 	Iterator<Annotation> iterator();
 	
-	void writeResults(String property, String lexElem, RVFDataset<String,String> dataset);
+	void writeResults(String lexElem, RVFDataset<String,String> dataset);
 	
-	Map<String,Double> evaluate(Map<String,RVFDataset<String,String>> datasets);
 }

@@ -26,6 +26,12 @@ import it.uniroma1.lcl.imms.Constants.LexicalItemAnnotation;
 
 public class LibLinearClassifier extends Classifier<Model> {
 	
+	public static final String CLASSIFIER_NAME = "liblinear";
+	public static final String PROPERTY_BIAS = CLASSIFIER_NAME+ ".bias";
+	public static final String PROPERTY_SOLVER = CLASSIFIER_NAME + ".solver";
+	public static final String PROPERTY_EPS = CLASSIFIER_NAME + ".eps";
+	
+	
 	static final String DEFAULT_BIAS = "-1.0";
 	static final String DEFAULT_SOLVER = SolverType.L2R_L2LOSS_SVC_DUAL.name();
 	Parameter parameter;
@@ -33,9 +39,9 @@ public class LibLinearClassifier extends Classifier<Model> {
 	
 	public LibLinearClassifier(Properties properties) {
 		super(properties);
-		bias = Double.parseDouble(getProperties().getProperty(Constants.PROPERTY_IMMS_LIBLINEAR_BIAS, DEFAULT_BIAS));
-		SolverType solver = SolverType.valueOf(getProperties().getProperty(Constants.PROPERTY_IMMS_LIBLINEAR_SOLVER, DEFAULT_SOLVER));
-		String eps = getProperties().getProperty(Constants.PROPERTY_IMMS_LIBLINEAR_EPS);
+		bias = Double.parseDouble(getProperties().getProperty(PROPERTY_BIAS, DEFAULT_BIAS));
+		SolverType solver = SolverType.valueOf(getProperties().getProperty(PROPERTY_SOLVER, DEFAULT_SOLVER));
+		String eps = getProperties().getProperty(PROPERTY_EPS);
 		parameter = new Parameter(solver, 1, eps!=null ? Double.parseDouble(eps) : Double.POSITIVE_INFINITY);
 	}
 
@@ -55,7 +61,7 @@ public class LibLinearClassifier extends Classifier<Model> {
 
 	private Problem getProblem(String lexElement) {		
 		Problem prob = new Problem();
-		RVFDataset<String,String> d = dataset(lexElement);
+		RVFDataset<String,String> d = getTrainingData(lexElement);
 		prob.bias = bias;	
 		prob.l = d.size();
 		prob.n = d.featureIndex.size() + (prob.bias >= 0 ? 1 : 0);
@@ -102,21 +108,19 @@ public class LibLinearClassifier extends Classifier<Model> {
 	
 
 	@Override
-	public List<String> test(String lexElem) {
-		RVFDataset<String,String> d = dataset(lexElem);
-		int[] labels = d.getLabelsArray();
+	public List<String> test(RVFDataset<String,String> d, Model model) {
 		List<String> answers = new ArrayList<String>();
+		if(model!=null && d!=null){
+			int[] labels = d.getLabelsArray();								
+			for (int i = 0; i < d.size(); i++) {												
+				Collection<Feature> featureNodes = asFeatureNodes(d.getRVFDatum(i).asFeaturesCounter(), d.featureIndex, model.getBias());
+				Feature[] instance =  featureNodes.toArray(new Feature[featureNodes.size()]);
 				
-		for (int i = 0; i < d.size(); i++) {			
-						
-			Model model = model(lexElem);			
-			Collection<Feature> featureNodes = asFeatureNodes(d.getRVFDatum(i).asFeaturesCounter(), d.featureIndex, model.getBias());
-			Feature[] instance =  featureNodes.toArray(new Feature[featureNodes.size()]);
-			
-			double answer = Linear.predict(model, instance);			
-			
-			labels[i]=(new Double(answer).intValue());			
-			answers.add(d.labelIndex.get(new Double(answer).intValue()));			
+				double answer = Linear.predict(model, instance);			
+				
+				labels[i]=(new Double(answer).intValue());			
+				answers.add(d.labelIndex.get(new Double(answer).intValue()));
+			}				
 		}
 		return answers;
 	}

@@ -6,22 +6,27 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 
-import edu.stanford.nlp.ling.CoreAnnotations.IDAnnotation;
-import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
-import edu.stanford.nlp.ling.CoreAnnotations.TokenBeginAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
 import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.pipeline.Annotator;
+import edu.stanford.nlp.pipeline.Annotator.Requirement;
 import edu.stanford.nlp.util.ArraySet;
 import edu.stanford.nlp.util.CoreMap;
 import it.uniroma1.lcl.imms.Constants;
 import it.uniroma1.lcl.imms.Constants.HeadTokenAnnotation;
 import it.uniroma1.lcl.imms.Constants.HeadsAnnotation;
+import it.uniroma1.lcl.imms.annotator.HeadTokenAnnotator;
 
 public class SorroundingWordsFeatureAnnotator implements Annotator {
 
-
+	public static final String ANNOTATION_NAME = "feat_srndword";
+	public static final String FEATURE_PREFIX = "SRNW_";
+	public static final Requirement REQUIREMENT = new Requirement(ANNOTATION_NAME);
+	
+	public static final String PROPERTY_WINDOWSIZE = ANNOTATION_NAME+".windowsize";
+	public static final String PROPERTY_ADDSTOPWRD = ANNOTATION_NAME+".addStopWords";
+	
 	public static final String DEFAULT_WINDOWSIZE = "2";
 	
 	Integer windowSize;
@@ -335,10 +340,10 @@ public class SorroundingWordsFeatureAnnotator implements Annotator {
 		this.stopWords.add("-rsb-");
 		this.stopWords.add("-lcb-");
 		this.stopWords.add("-rcb-");
-		for(String word : properties.getProperty(Constants.PROPERTY_IMMS_SRNDWORDS_ADDSTOPWRD,"").split("\\s")){
+		for(String word : properties.getProperty(PROPERTY_ADDSTOPWRD,"").split("\\s")){
 			stopWords.add(word.trim().toLowerCase());
 		}
-		windowSize = Integer.valueOf(properties.getProperty(Constants.PROPERTY_IMMS_SRNDWORDS_WINDOWSIZE,DEFAULT_WINDOWSIZE));
+		windowSize = Integer.valueOf(properties.getProperty(PROPERTY_WINDOWSIZE,DEFAULT_WINDOWSIZE));
 	}
 
 	@Override
@@ -357,14 +362,14 @@ public class SorroundingWordsFeatureAnnotator implements Annotator {
 		for(int i=headIndex-1; i >= 0 && position < windowSize; i--){
 			CoreLabel token = tokens.get(i);
 			if(filter(token)){
-				features.add(new Feature<Boolean>("S_" + token.lemma().toLowerCase().trim(), true));
+				features.add(new Feature<Boolean>(FEATURE_PREFIX + token.lemma().toLowerCase().trim(), true));
 			}					
 		}
 		position = 0;
 		for(int i=headIndex+1; i < tokens.size() && position < windowSize; i++){
 			CoreLabel token = tokens.get(i);
 			if(filter(token)){
-				features.add(new Feature<Boolean>("S_" + token.lemma().toLowerCase().trim(), true));
+				features.add(new Feature<Boolean>(FEATURE_PREFIX + token.lemma().toLowerCase().trim(), true));
 			}					
 		}
 		
@@ -377,12 +382,12 @@ public class SorroundingWordsFeatureAnnotator implements Annotator {
 	}
 	@Override
 	public Set<Requirement> requirementsSatisfied() {
-		return Collections.singleton(Constants.REQUIREMENT_ANNOTATOR_FEAT_IMMS_SRNDWORDS);
+		return Collections.singleton(REQUIREMENT);
 	}
 
 	@Override
 	public Set<Requirement> requires() {
-		return Collections.unmodifiableSet(new ArraySet<>(TOKENIZE_REQUIREMENT, LEMMA_REQUIREMENT,Constants.REQUIREMENT_ANNOTATOR_IMMS_HEADTOKEN));
+		return Collections.unmodifiableSet(new ArraySet<>(TOKENIZE_REQUIREMENT, LEMMA_REQUIREMENT,HeadTokenAnnotator.REQUIREMENT));
 	}
 
 }
